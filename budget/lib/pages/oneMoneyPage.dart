@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:budget/database/tables.dart';
 import 'package:budget/struct/databaseGlobal.dart';
-import 'package:budget/widgets/openBottomSheet.dart';
+import 'package:budget/colors.dart';
 
 class OneMoneyQuickEntryPage extends StatefulWidget {
   const OneMoneyQuickEntryPage({Key? key}) : super(key: key);
@@ -53,7 +53,6 @@ class _OneMoneyQuickEntryPageState extends State<OneMoneyQuickEntryPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // شريط الفئة المختارة والمبلغ
                   Row(
                     children: [
                       CircleAvatar(
@@ -92,7 +91,6 @@ class _OneMoneyQuickEntryPageState extends State<OneMoneyQuickEntryPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // لوحة أرقام 1Money السريعة
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -141,7 +139,6 @@ class _OneMoneyQuickEntryPageState extends State<OneMoneyQuickEntryPage> {
                             double finalAmount = double.tryParse(amountText) ?? 0;
                             if (finalAmount <= 0) return;
 
-                            // حفظ المعاملة مباشرة في قاعدة بيانات Cashew
                             await database.createOrUpdateTransaction(
                               insert: true,
                               Transaction(
@@ -191,7 +188,6 @@ class _OneMoneyQuickEntryPageState extends State<OneMoneyQuickEntryPage> {
 
           return Column(
             children: [
-              // شريط اختيار المحفظة/الحساب العلوي
               if (wallets.isNotEmpty)
                 Container(
                   height: 60,
@@ -214,8 +210,6 @@ class _OneMoneyQuickEntryPageState extends State<OneMoneyQuickEntryPage> {
                     },
                   ),
                 ),
-
-              // شبكة أيقونات الفئات الدائرية على طريقة 1Money
               Expanded(
                 child: StreamBuilder<List<TransactionCategory>>(
                   stream: database.watchAllCategories(),
@@ -281,14 +275,4 @@ class _OneMoneyQuickEntryPageState extends State<OneMoneyQuickEntryPage> {
       ),
     );
   }
-}
-
-// دالة مساعدة لتحويل كود اللون النصي في Cashew إلى Color
-class HexColor extends Color {
-  static int _getColorFromHex(String hexColor) {
-    hexColor = hexColor.toUpperCase().replaceAll("#", "");
-    if (hexColor.length == 6) hexColor = "FF$hexColor";
-    return int.parse(hexColor, radix: 16);
-  }
-  HexColor(final String hexColor) : super(_getColorFromHex(hexColor));
 }
