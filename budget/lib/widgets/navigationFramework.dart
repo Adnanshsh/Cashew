@@ -1,3 +1,4 @@
+import 'package:budget/pages/oneMoneyPage.dart';
 import 'package:animations/animations.dart';
 import 'package:budget/colors.dart';
 import 'package:budget/database/initializeDefaultDatabase.dart';
@@ -354,7 +355,7 @@ Future<bool> runAllCloudFunctions(BuildContext context,
 
 class PageNavigationFrameworkState extends State<PageNavigationFramework> {
   final List<Widget> pages = [
-    HomePage(key: homePageStateKey), // 0
+    const OneMoneyQuickEntryPage(), // 0
     TransactionsListPage(key: transactionsListPageStateKey), //1
     BudgetsListPage(key: budgetsListPageStateKey, enableBackButton: false), //2
     MoreActionsPage(key: settingsPageStateKey), //3
