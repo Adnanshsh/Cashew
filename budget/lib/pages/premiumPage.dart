@@ -26,10 +26,9 @@ import 'package:sa3_liquid/sa3_liquid.dart';
 import 'package:budget/widgets/openContainerNavigation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
-// تم تعطيل نوافذ المطالبة بالاشتراك وتفعيل البرو دائماً
 bool premiumPopupEnabled = false;
 bool tryStoreEnabled = false;
-StreamSubscription<List<PurchaseDetails>>? purchaseListener;
+StreamSubscription? purchaseListener;
 Map<String, ProductDetails> storeProducts = {};
 Map<String, String> productIDs = {
   'yearly': getPlatform(ignoreEmulation: true) == PlatformOS.isIOS
@@ -158,12 +157,11 @@ void listenToPurchaseUpdated({
   required bool popRouteWithPurchase,
 }) {}
 
-Future> initializeStoreAndPurchases(
+Future initializeStoreAndPurchases(
     {required BuildContext context, required bool popRouteWithPurchase}) async {
-  // تفعيل اشتراك مدى الحياة تلقائياً عند تشغيل التطبيق
   appStateSettings["purchaseID"] = productIDs["lifetime"];
   premiumPopupEnabled = false;
-  return {};
+  return <String, ProductDetails>{};
 }
 
 Future restorePurchases(BuildContext context) async {
@@ -172,7 +170,6 @@ Future restorePurchases(BuildContext context) async {
 
 showHelpRestorePopup(BuildContext context) {}
 
-// إرجاع true دائماً لفتح جميع ميزات البرو بدون أي قيود
 bool hidePremiumPopup() {
   appStateSettings["purchaseID"] = productIDs["lifetime"];
   return true;
@@ -260,7 +257,6 @@ class SubscriptionOption extends StatelessWidget {
   }
 }
 
-// إلغاء القفل عن أي ميزة محمية في التطبيق
 class LockedFeature extends StatelessWidget {
   const LockedFeature(
       {required this.child, this.actionAfter, this.showLock = false, Key? key})
@@ -311,7 +307,6 @@ class PremiumBackground extends StatelessWidget {
   }
 }
 
-// إخفاء بانر المطالبة بالترقية من صفحة الإعدادات والمزيد
 class PremiumBanner extends StatelessWidget {
   const PremiumBanner({super.key});
 
