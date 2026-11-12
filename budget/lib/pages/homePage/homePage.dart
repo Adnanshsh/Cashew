@@ -1,4 +1,3 @@
-import 'package:budget/pages/homePage/homePageOneMoneyDial.dart';
 import 'package:budget/colors.dart';
 import 'package:budget/database/generatePreviewData.dart';
 import 'package:budget/database/tables.dart';
@@ -7,6 +6,7 @@ import 'package:budget/pages/homePage/homePageHeatmap.dart';
 import 'package:budget/pages/homePage/homePageLineGraph.dart';
 import 'package:budget/pages/homePage/homePageNetWorth.dart';
 import 'package:budget/pages/homePage/homePageObjectives.dart';
+import 'package:budget/pages/homePage/homePageOneMoneyDial.dart';
 import 'package:budget/pages/homePage/homePagePieChart.dart';
 import 'package:budget/pages/homePage/homePageWalletList.dart';
 import 'package:budget/pages/homePage/homePageWalletSwitcher.dart';
@@ -57,11 +57,6 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   void scrollToTop({int duration = 1200}) {
-    // if (_scrollController.offset <= 0) {
-    //   pushRoute(context, EditHomePage());
-    // } else {
-
-    // }
     _scrollController.animateTo(0,
         duration: Duration(
             milliseconds:
@@ -78,6 +73,7 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late AnimationController _animationControllerHeader2;
   int selectedSlidingSelector = 1;
 
+  @override
   void initState() {
     super.initState();
     _animationControllerHeader = AnimationController(vsync: this, value: 1);
@@ -177,6 +173,7 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
             );
 
     Map<String, Widget?> homePageSections = {
+      "oneMoneyDial": HomePageOneMoneyDial(),
       "wallets": isHomeScreenSectionEnabled(context, "showWalletSwitcher")
           ? HomePageWalletSwitcher()
           : null,
@@ -288,7 +285,6 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                       ],
                     ),
-                    // Wipe all remaining pixels off - sometimes graphics artifacts are left behind
                     Container(
                         height: 1,
                         color: Theme.of(context).colorScheme.background),
@@ -301,7 +297,6 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                         isHomePageSpace: true) /
                                     1.34),
                             child: Container(
-                              // Subtract one (1) here because of the thickness of the wiper above
                               alignment: AlignmentDirectional.bottomStart,
                               padding: EdgeInsetsDirectional.only(
                                   start: 9,
@@ -330,6 +325,7 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         : SizedBox(height: 5),
                     // Not full screen
                     if (enableDoubleColumn(context) != true) ...[
+                      HomePageOneMoneyDial(),
                       KeepAliveClientMixin(child: HomePageRatingBox()),
                       for (String sectionKey
                           in appStateSettings["homePageOrder"])
@@ -337,6 +333,7 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ],
                     // Full screen top section
                     if (enableDoubleColumn(context) == true) ...[
+                      HomePageOneMoneyDial(),
                       for (String sectionKey
                           in appStateSettings["homePageOrderFullScreen"])
                         if (homePageSectionsFullScreenCenter
@@ -400,7 +397,6 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               ? 25
                               : 73,
                     ),
-                    // Wipe all remaining pixels off - sometimes graphics artifacts are left behind
                     Container(
                         height: 1,
                         color: Theme.of(context).colorScheme.background),
