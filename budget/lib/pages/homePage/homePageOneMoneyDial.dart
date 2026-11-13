@@ -45,14 +45,16 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
       builder: (context, walletSnap) {
         final wallets = walletSnap.data ?? [];
         if (wallets.isNotEmpty && selectedWalletPk == null) {
-          selectedWalletPk = appStateSettings["selectedWalletPk"] ?? wallets.first.walletPk;
+          selectedWalletPk =
+              appStateSettings["selectedWalletPk"] ?? wallets.first.walletPk;
         }
 
         return StreamBuilder<List<TransactionCategory>>(
           stream: database.watchAllCategories(),
           builder: (context, catSnap) {
             final allCategories = catSnap.data ?? [];
-            final categories = allCategories.where((c) => c.income == showIncome).toList();
+            final categories =
+                allCategories.where((c) => c.income == showIncome).toList();
 
             return StreamBuilder<List<Transaction>>(
               stream: database.getTransactionsInTimeRangeFromCategories(
@@ -74,7 +76,8 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
 
                 for (var t in transactions) {
                   if (!t.paid) continue;
-                  if (selectedWalletPk != null && t.walletFk != selectedWalletPk) continue;
+                  if (selectedWalletPk != null &&
+                      t.walletFk != selectedWalletPk) continue;
 
                   if (t.income) {
                     totalIncome += t.amount.abs();
@@ -88,9 +91,9 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
                   }
                 }
 
-                final double activeTotal = showIncome ? totalIncome : totalExpense;
+                final double activeTotal =
+                    showIncome ? totalIncome : totalExpense;
 
-                // تقسيم الفئات: أول 8 فئات تحيط بالدائرة البيانية (أسلوب 1Money الأصلي) والباقي في شبكة سفلية
                 final dialCategories = categories.take(8).toList();
                 final extraCategories = categories.skip(8).toList();
 
@@ -98,15 +101,16 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
                 for (var cat in categories) {
                   final amt = categoryTotals[cat.categoryPk] ?? 0;
                   if (amt > 0) {
-                    segments.add(_DialSegment(amount: amt, color: _parseColor(cat.colour)));
+                    segments.add(_DialSegment(
+                        amount: amt, color: _parseColor(cat.colour)));
                   }
                 }
 
                 return Column(
                   children: [
-                    // 1. شريط اختيار المحفظة والتبديل بين المصروفات والدخل
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       child: Row(
                         children: [
                           if (wallets.isNotEmpty)
@@ -124,18 +128,21 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
                                         child: ChoiceChip(
                                           label: const Text("الكل"),
                                           selected: isAll,
-                                          onSelected: (_) => setState(() => selectedWalletPk = null),
+                                          onSelected: (_) => setState(
+                                              () => selectedWalletPk = null),
                                         ),
                                       );
                                     }
                                     final w = wallets[idx - 1];
-                                    final isSel = w.walletPk == selectedWalletPk;
+                                    final isSel =
+                                        w.walletPk == selectedWalletPk;
                                     return Padding(
                                       padding: const EdgeInsets.only(left: 6),
                                       child: ChoiceChip(
                                         label: Text(w.name),
                                         selected: isSel,
-                                        onSelected: (_) => setState(() => selectedWalletPk = w.walletPk),
+                                        onSelected: (_) => setState(() =>
+                                            selectedWalletPk = w.walletPk),
                                       ),
                                     );
                                   },
@@ -145,22 +152,21 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
                         ],
                       ),
                     ),
-
-                    // 2. القرص الدائري التفاعلي (1Money Circular Dial)
                     SizedBox(
                       height: 350,
                       width: double.infinity,
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final center = Offset(constraints.maxWidth / 2, constraints.maxHeight / 2);
+                          final center = Offset(constraints.maxWidth / 2,
+                              constraints.maxHeight / 2);
                           const double orbitRadius = 122.0;
 
                           return Stack(
                             alignment: Alignment.center,
                             children: [
-                              // الحلقة البيانية في المنتصف
                               GestureDetector(
-                                onTap: () => setState(() => showIncome = !showIncome),
+                                onTap: () =>
+                                    setState(() => showIncome = !showIncome),
                                 child: SizedBox(
                                   width: 145,
                                   height: 145,
@@ -169,28 +175,35 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
                                     children: [
                                       CustomPaint(
                                         size: const Size(145, 145),
-                                        painter: _OneMoneyRingPainter(segments: segments),
+                                        painter: _OneMoneyRingPainter(
+                                            segments: segments),
                                       ),
                                       Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           TextFont(
-                                            text: showIncome ? "الدخل" : "المصروفات",
+                                            text: showIncome
+                                                ? "الدخل"
+                                                : "المصروفات",
                                             fontSize: 12,
                                             textColor: Colors.grey,
                                           ),
                                           const SizedBox(height: 2),
                                           TextFont(
-                                            text: "${_formatAmount(activeTotal)} د.ل",
+                                            text:
+                                                "${_formatAmount(activeTotal)} د.ل",
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
-                                            textColor: showIncome ? Colors.green : Colors.redAccent,
+                                            textColor: showIncome
+                                                ? Colors.green
+                                                : Colors.redAccent,
                                           ),
                                           const SizedBox(height: 2),
                                           TextFont(
                                             text: "اضغط للتبديل",
                                             fontSize: 10,
-                                            textColor: Colors.grey.withOpacity(0.7),
+                                            textColor:
+                                                Colors.grey.withOpacity(0.7),
                                           ),
                                         ],
                                       ),
@@ -198,21 +211,29 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
                                   ),
                                 ),
                               ),
-
-                              // الأيقونات المحيطة بالدائرة (8 فئات رئيسية)
                               ...List.generate(dialCategories.length, (index) {
                                 final cat = dialCategories[index];
-                                final angle = (2 * math.pi * index / dialCategories.length) - (math.pi / 2);
-                                final dx = center.dx + orbitRadius * math.cos(angle) - 38;
-                                final dy = center.dy + orbitRadius * math.sin(angle) - 38;
-                                final spent = categoryTotals[cat.categoryPk] ?? 0;
+                                final angle = (2 *
+                                        math.pi *
+                                        index /
+                                        dialCategories.length) -
+                                    (math.pi / 2);
+                                final dx = center.dx +
+                                    orbitRadius * math.cos(angle) -
+                                    38;
+                                final dy = center.dy +
+                                    orbitRadius * math.sin(angle) -
+                                    38;
+                                final spent =
+                                    categoryTotals[cat.categoryPk] ?? 0;
 
                                 return Positioned(
                                   left: dx,
                                   top: dy,
                                   width: 76,
                                   height: 76,
-                                  child: _buildCategoryNode(context, cat, spent),
+                                  child: _buildCategoryNode(
+                                      context, cat, spent),
                                 );
                               }),
                             ],
@@ -220,15 +241,14 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
                         },
                       ),
                     ),
-
-                    // 3. بقية الفئات في شبكة مرتبة بالأسفل
                     if (extraCategories.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 4,
                             mainAxisSpacing: 12,
                             crossAxisSpacing: 8,
@@ -252,7 +272,8 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
     );
   }
 
-  Widget _buildCategoryNode(BuildContext context, TransactionCategory cat, double spent) {
+  Widget _buildCategoryNode(
+      BuildContext context, TransactionCategory cat, double spent) {
     final catColor = _parseColor(cat.colour);
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -268,11 +289,7 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
       onLongPress: () {
         pushRoute(
           context,
-          TransactionsSearchPage(
-            initialFilters: SearchFilters(
-              categoryPks: [cat.categoryPk],
-            ),
-          ),
+          const TransactionsSearchPage(),
         );
       },
       child: Column(
