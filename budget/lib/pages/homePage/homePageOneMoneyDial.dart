@@ -7,14 +7,14 @@ import 'package:budget/functions.dart';
 import 'package:budget/pages/addCategoryPage.dart';
 import 'package:budget/widgets/openPopup.dart';
 
-class OneMoneyQuickEntryPage extends StatefulWidget {
-  const OneMoneyQuickEntryPage({Key? key}) : super(key: key);
+class HomePageOneMoneyDial extends StatefulWidget {
+  const HomePageOneMoneyDial({Key? key}) : super(key: key);
 
   @override
-  State<OneMoneyQuickEntryPage> createState() => _OneMoneyQuickEntryPageState();
+  State<HomePageOneMoneyDial> createState() => _HomePageOneMoneyDialState();
 }
 
-class _OneMoneyQuickEntryPageState extends State<OneMoneyQuickEntryPage> {
+class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
   String? selectedWalletPk;
   bool showIncome = false;
   DateTime selectedMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
@@ -484,7 +484,7 @@ class _OneMoneyQuickEntryPageState extends State<OneMoneyQuickEntryPage> {
       onTap: () {
         pushRoute(
           context,
-          const AddCategoryPage(
+          AddCategoryPage(
             routesToPopAfterDelete: RoutesToPopAfterDelete.None,
           ),
         );
@@ -518,436 +518,400 @@ class _OneMoneyQuickEntryPageState extends State<OneMoneyQuickEntryPage> {
     final monthLabel =
         "${_arabicMonths[selectedMonth.month - 1]} ${selectedMonth.year}";
 
-    return Scaffold(
-      body: SafeArea(
-        child: StreamBuilder<List<TransactionWallet>>(
-          stream:
-              database.getAllPinnedWallets(HomePageWidgetDisplay.WalletList).$1,
-          builder: (context, walletSnap) {
-            final wallets = walletSnap.data ?? [];
+    return StreamBuilder<List<TransactionWallet>>(
+      stream:
+          database.getAllPinnedWallets(HomePageWidgetDisplay.WalletList).$1,
+      builder: (context, walletSnap) {
+        final wallets = walletSnap.data ?? [];
 
-            return StreamBuilder<List<TransactionCategory>>(
-              stream: database.watchAllCategories(),
-              builder: (context, catSnap) {
-                final allCategories = catSnap.data ?? [];
-                final categories = allCategories
-                    .where((c) => c.income == showIncome)
-                    .toList();
+        return StreamBuilder<List<TransactionCategory>>(
+          stream: database.watchAllCategories(),
+          builder: (context, catSnap) {
+            final allCategories = catSnap.data ?? [];
+            final categories =
+                allCategories.where((c) => c.income == showIncome).toList();
 
-                return StreamBuilder<List<Transaction>>(
-                  stream: database.getTransactionsInTimeRangeFromCategories(
-                    startOfMonth,
-                    endOfMonth,
-                    null,
-                    null,
-                    true,
-                    null,
-                    null,
-                    null,
-                  ),
-                  builder: (context, transSnap) {
-                    final transactions = transSnap.data ?? [];
+            return StreamBuilder<List<Transaction>>(
+              stream: database.getTransactionsInTimeRangeFromCategories(
+                startOfMonth,
+                endOfMonth,
+                null,
+                null,
+                true,
+                null,
+                null,
+                null,
+              ),
+              builder: (context, transSnap) {
+                final transactions = transSnap.data ?? [];
 
-                    Map<String, double> categoryTotals = {};
-                    double totalExpenses = 0;
-                    double totalIncome = 0;
+                Map<String, double> categoryTotals = {};
+                double totalExpenses = 0;
+                double totalIncome = 0;
 
-                    for (var t in transactions) {
-                      if (!t.paid) continue;
-                      if (selectedWalletPk != null &&
-                          t.walletFk != selectedWalletPk) continue;
+                for (var t in transactions) {
+                  if (!t.paid) continue;
+                  if (selectedWalletPk != null &&
+                      t.walletFk != selectedWalletPk) continue;
 
-                      if (t.income) {
-                        totalIncome += t.amount.abs();
-                      } else {
-                        totalExpenses += t.amount.abs();
-                      }
-                      if (t.income == showIncome) {
-                        categoryTotals[t.categoryFk] =
-                            (categoryTotals[t.categoryFk] ?? 0) +
-                                t.amount.abs();
-                      }
-                    }
+                  if (t.income) {
+                    totalIncome += t.amount.abs();
+                  } else {
+                    totalExpenses += t.amount.abs();
+                  }
+                  if (t.income == showIncome) {
+                    categoryTotals[t.categoryFk] =
+                        (categoryTotals[t.categoryFk] ?? 0) +
+                            t.amount.abs();
+                  }
+                }
 
-                    final double activeTotal =
-                        showIncome ? totalIncome : totalExpenses;
+                final double activeTotal =
+                    showIncome ? totalIncome : totalExpenses;
 
-                    List<_ChartSegment> segments = [];
-                    for (var cat in categories) {
-                      final amt = categoryTotals[cat.categoryPk] ?? 0;
-                      if (amt > 0) {
-                        segments.add(_ChartSegment(
-                            amount: amt, color: _parseColor(cat.colour)));
-                      }
-                    }
+                List<_ChartSegment> segments = [];
+                for (var cat in categories) {
+                  final amt = categoryTotals[cat.categoryPk] ?? 0;
+                  if (amt > 0) {
+                    segments.add(_ChartSegment(
+                        amount: amt, color: _parseColor(cat.colour)));
+                  }
+                }
 
-                    // توزيع الفئات بنفس هندسة الصورة المرفقة:
-                    // الصف 1: 4 فئات (0, 1, 2, 3)
-                    // الصف 2 والصف 3 (حول الدائرة): يمين (4, 6) ويسار (5, 7)
-                    // الصف 4 وما بعده: باقي الفئات + زر (+)
-                    final topRow = categories.take(4).toList();
-                    final rightCol = <TransactionCategory>[];
-                    final leftCol = <TransactionCategory>[];
-                    if (categories.length > 4) rightCol.add(categories[4]);
-                    if (categories.length > 5) leftCol.add(categories[5]);
-                    if (categories.length > 6) rightCol.add(categories[6]);
-                    if (categories.length > 7) leftCol.add(categories[7]);
-                    final bottomCats = categories.skip(8).toList();
+                final topRow = categories.take(4).toList();
+                final rightCol = <TransactionCategory>[];
+                final leftCol = <TransactionCategory>[];
+                if (categories.length > 4) rightCol.add(categories[4]);
+                if (categories.length > 5) leftCol.add(categories[5]);
+                if (categories.length > 6) rightCol.add(categories[6]);
+                if (categories.length > 7) leftCol.add(categories[7]);
+                final bottomCats = categories.skip(8).toList();
 
-                    final activeWalletName = selectedWalletPk == null
-                        ? "كل الحسابات"
-                        : wallets
-                            .firstWhere(
-                              (w) => w.walletPk == selectedWalletPk,
-                              orElse: () => wallets.first,
-                            )
-                            .name;
+                final activeWalletName = selectedWalletPk == null
+                    ? "كل الحسابات"
+                    : wallets
+                        .firstWhere(
+                          (w) => w.walletPk == selectedWalletPk,
+                          orElse: () => wallets.first,
+                        )
+                        .name;
 
-                    return Column(
-                      children: [
-                        // 1. الهيدر العلوي المطابق للصورة (كل الحسابات + إجمالي الرصيد)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // زر التعديل / التبديل بين الدخل والمصروفات
-                              IconButton(
-                                icon: Icon(
-                                  showIncome
-                                      ? Icons.trending_up_rounded
-                                      : Icons.edit_outlined,
-                                  color: Colors.grey.shade700,
-                                ),
-                                onPressed: () =>
-                                    setState(() => showIncome = !showIncome),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                showIncome
+                                    ? Icons.trending_up_rounded
+                                    : Icons.edit_outlined,
+                                color: Colors.grey.shade700,
                               ),
-                              // اسم الحساب وإجمالي الرصيد
-                              InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () {
-                                  if (wallets.isEmpty) return;
-                                  setState(() {
-                                    if (selectedWalletPk == null) {
-                                      selectedWalletPk = wallets.first.walletPk;
+                              onPressed: () =>
+                                  setState(() => showIncome = !showIncome),
+                            ),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () {
+                                if (wallets.isEmpty) return;
+                                setState(() {
+                                  if (selectedWalletPk == null) {
+                                    selectedWalletPk = wallets.first.walletPk;
+                                  } else {
+                                    int idx = wallets.indexWhere((w) =>
+                                        w.walletPk == selectedWalletPk);
+                                    if (idx + 1 < wallets.length) {
+                                      selectedWalletPk =
+                                          wallets[idx + 1].walletPk;
                                     } else {
-                                      int idx = wallets.indexWhere((w) =>
-                                          w.walletPk == selectedWalletPk);
-                                      if (idx + 1 < wallets.length) {
-                                        selectedWalletPk =
-                                            wallets[idx + 1].walletPk;
-                                      } else {
-                                        selectedWalletPk = null;
-                                      }
+                                      selectedWalletPk = null;
                                     }
-                                  });
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 4),
-                                  child: Column(
-                                    children: [
-                                      Text(
-                                        activeWalletName,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
+                                  }
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      activeWalletName,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        "${_formatAmount(totalIncome - totalExpenses)} ل.د",
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      "${_formatAmount(totalIncome - totalExpenses)} ل.د",
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.account_circle_outlined,
+                                color: Colors.grey.shade700,
+                              ),
+                              onPressed: () =>
+                                  setState(() => showIncome = !showIncome),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                  Icons.keyboard_double_arrow_right),
+                              onPressed: () {
+                                setState(() {
+                                  selectedMonth = DateTime(
+                                      selectedMonth.year,
+                                      selectedMonth.month - 1,
+                                      1);
+                                });
+                              },
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer
+                                    .withOpacity(0.55),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                          color: Colors.black87, width: 1.2),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      "${DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day}",
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    monthLabel,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.keyboard_arrow_down,
+                                      size: 18),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                  Icons.keyboard_double_arrow_left),
+                              onPressed: () {
+                                setState(() {
+                                  selectedMonth = DateTime(
+                                      selectedMonth.year,
+                                      selectedMonth.month + 1,
+                                      1);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: List.generate(4, (i) {
+                          if (i < topRow.length) {
+                            final cat = topRow[i];
+                            return Expanded(
+                              child: _buildCategoryCell(
+                                context,
+                                cat,
+                                categoryTotals[cat.categoryPk] ?? 0,
+                                wallets,
+                              ),
+                            );
+                          }
+                          return const Expanded(child: SizedBox());
+                        }),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: Column(
+                              children: [
+                                if (rightCol.isNotEmpty)
+                                  _buildCategoryCell(
+                                    context,
+                                    rightCol[0],
+                                    categoryTotals[
+                                            rightCol[0].categoryPk] ??
+                                        0,
+                                    wallets,
+                                  ),
+                                const SizedBox(height: 8),
+                                if (rightCol.length > 1)
+                                  _buildCategoryCell(
+                                    context,
+                                    rightCol[1],
+                                    categoryTotals[
+                                            rightCol[1].categoryPk] ??
+                                        0,
+                                    wallets,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: GestureDetector(
+                              onTap: () => setState(
+                                  () => showIncome = !showIncome),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 170,
+                                  height: 170,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      CustomPaint(
+                                        size: const Size(170, 170),
+                                        painter:
+                                            _OneMoneyDonutPainter(
+                                                segments: segments),
+                                      ),
+                                      Column(
+                                        mainAxisSize:
+                                            MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            showIncome
+                                                ? "الدخل"
+                                                : "النفقات",
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight:
+                                                  FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            "${_formatAmount(activeTotal)} ل.د",
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight:
+                                                  FontWeight.bold,
+                                              color: showIncome
+                                                  ? Colors.green
+                                                  : Colors.redAccent,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            "${_formatAmount(showIncome ? totalExpenses : totalIncome)} ل.د",
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: showIncome
+                                                  ? Colors.redAccent
+                                                  : Colors.teal,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                              // أيقونة الحساب
-                              IconButton(
-                                icon: Icon(
-                                  Icons.account_circle_outlined,
-                                  color: Colors.grey.shade700,
-                                ),
-                                onPressed: () =>
-                                    setState(() => showIncome = !showIncome),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-
-                        // 2. شريط التنقل بين الأشهر (« 30 نوفمبر 2026 »)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 4),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                    Icons.keyboard_double_arrow_right),
-                                onPressed: () {
-                                  setState(() {
-                                    selectedMonth = DateTime(
-                                        selectedMonth.year,
-                                        selectedMonth.month - 1,
-                                        1);
-                                  });
-                                },
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 18, vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer
-                                      .withOpacity(0.55),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                            color: Colors.black87, width: 1.2),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        "${DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day}",
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      monthLabel,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.keyboard_arrow_down,
-                                        size: 18),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                    Icons.keyboard_double_arrow_left),
-                                onPressed: () {
-                                  setState(() {
-                                    selectedMonth = DateTime(
-                                        selectedMonth.year,
-                                        selectedMonth.month + 1,
-                                        1);
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 6),
-
-                        // 3. شبكة الفئات المحيطة بالحلقة البيانية (تصميم 1Money المطابق للصورة)
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                          Expanded(
+                            flex: 1,
                             child: Column(
                               children: [
-                                // الصف العلوي: 4 فئات
-                                Row(
-                                  children: List.generate(4, (i) {
-                                    if (i < topRow.length) {
-                                      final cat = topRow[i];
-                                      return Expanded(
-                                        child: _buildCategoryCell(
-                                          context,
-                                          cat,
-                                          categoryTotals[cat.categoryPk] ?? 0,
-                                          wallets,
-                                        ),
-                                      );
-                                    }
-                                    return const Expanded(child: SizedBox());
-                                  }),
-                                ),
-
-                                const SizedBox(height: 6),
-
-                                // القسم الأوسط: عمود يمين (فئتان) + الحلقة البيانية في المنتصف + عمود يسار (فئتان)
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    // العمود الأيمن (فئتان)
-                                    Expanded(
-                                      flex: 1,
-                                      child: Column(
-                                        children: [
-                                          if (rightCol.isNotEmpty)
-                                            _buildCategoryCell(
-                                              context,
-                                              rightCol[0],
-                                              categoryTotals[
-                                                      rightCol[0].categoryPk] ??
-                                                  0,
-                                              wallets,
-                                            ),
-                                          const SizedBox(height: 8),
-                                          if (rightCol.length > 1)
-                                            _buildCategoryCell(
-                                              context,
-                                              rightCol[1],
-                                              categoryTotals[
-                                                      rightCol[1].categoryPk] ??
-                                                  0,
-                                              wallets,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    // الحلقة البيانية المركزية (النفقات / الدخل)
-                                    Expanded(
-                                      flex: 2,
-                                      child: GestureDetector(
-                                        onTap: () => setState(
-                                            () => showIncome = !showIncome),
-                                        child: Center(
-                                          child: SizedBox(
-                                            width: 170,
-                                            height: 170,
-                                            child: Stack(
-                                              alignment: Alignment.center,
-                                              children: [
-                                                CustomPaint(
-                                                  size: const Size(170, 170),
-                                                  painter:
-                                                      _OneMoneyDonutPainter(
-                                                          segments: segments),
-                                                ),
-                                                Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Text(
-                                                      showIncome
-                                                          ? "الدخل"
-                                                          : "النفقات",
-                                                      style: const TextStyle(
-                                                        fontSize: 15,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      "${_formatAmount(activeTotal)} ل.د",
-                                                      style: TextStyle(
-                                                        fontSize: 18,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: showIncome
-                                                            ? Colors.green
-                                                            : Colors.redAccent,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      "${_formatAmount(showIncome ? totalExpenses : totalIncome)} ل.د",
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: showIncome
-                                                            ? Colors.redAccent
-                                                            : Colors.teal,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-
-                                    // العمود الأيسر (فئتان)
-                                    Expanded(
-                                      flex: 1,
-                                      child: Column(
-                                        children: [
-                                          if (leftCol.isNotEmpty)
-                                            _buildCategoryCell(
-                                              context,
-                                              leftCol[0],
-                                              categoryTotals[
-                                                      leftCol[0].categoryPk] ??
-                                                  0,
-                                              wallets,
-                                            ),
-                                          const SizedBox(height: 8),
-                                          if (leftCol.length > 1)
-                                            _buildCategoryCell(
-                                              context,
-                                              leftCol[1],
-                                              categoryTotals[
-                                                      leftCol[1].categoryPk] ??
-                                                  0,
-                                              wallets,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 6),
-
-                                // الصف السفلي: الفئات المتبقية + زر (+) لإضافة فئة جديدة
-                                GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 4,
-                                    childAspectRatio: 0.72,
+                                if (leftCol.isNotEmpty)
+                                  _buildCategoryCell(
+                                    context,
+                                    leftCol[0],
+                                    categoryTotals[
+                                            leftCol[0].categoryPk] ??
+                                        0,
+                                    wallets,
                                   ),
-                                  itemCount: bottomCats.length + 1,
-                                  itemBuilder: (context, index) {
-                                    if (index == bottomCats.length) {
-                                      return _buildAddCategoryCell(context);
-                                    }
-                                    final cat = bottomCats[index];
-                                    return _buildCategoryCell(
-                                      context,
-                                      cat,
-                                      categoryTotals[cat.categoryPk] ?? 0,
-                                      wallets,
-                                    );
-                                  },
-                                ),
+                                const SizedBox(height: 8),
+                                if (leftCol.length > 1)
+                                  _buildCategoryCell(
+                                    context,
+                                    leftCol[1],
+                                    categoryTotals[
+                                            leftCol[1].categoryPk] ??
+                                        0,
+                                    wallets,
+                                  ),
                               ],
                             ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          childAspectRatio: 0.72,
                         ),
-                      ],
-                    );
-                  },
+                        itemCount: bottomCats.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == bottomCats.length) {
+                            return _buildAddCategoryCell(context);
+                          }
+                          final cat = bottomCats[index];
+                          return _buildCategoryCell(
+                            context,
+                            cat,
+                            categoryTotals[cat.categoryPk] ?? 0,
+                            wallets,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 );
               },
             );
           },
-        ),
-      ),
+        );
+      },
     );
   }
 }
