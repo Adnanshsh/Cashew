@@ -1421,4 +1421,42 @@ class _OneMoneyDonutPainter extends CustomPainter {
   final List<_ChartSegment> segments;
   _OneMoneyDonutPainter({required this.segments});
 
-  @
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 10;
+    const strokeWidth = 14.0;
+
+    final bgPaint = Paint()
+      ..color = Colors.grey.withOpacity(0.28)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    canvas.drawCircle(center, radius, bgPaint);
+
+    double total = segments.fold(0, (sum, item) => sum + item.amount);
+    if (total <= 0) return;
+
+    double startAngle = -math.pi / 2;
+    for (var seg in segments) {
+      final sweepAngle = (seg.amount / total) * 2 * math.pi;
+      final paint = Paint()
+        ..color = seg.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.butt;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        math.max(0.01, sweepAngle - 0.03),
+        false,
+        paint,
+      );
+      startAngle += sweepAngle;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
