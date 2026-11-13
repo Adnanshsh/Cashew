@@ -24,10 +24,16 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
 
-      - name: Fix Android Signing for Custom Build
-        working-directory: ./budget/android/app
+      - name: Unlock Cashew Pro & Fixed Signing
+        working-directory: ./budget
         run: |
-          sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/g' build.gradle
+          rm -f android/app/debug.keystore
+          keytool -genkey -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1
+          sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/g' android/app/build.gradle
+          sed -i 's/appStateSettings\["purchased"\] == true/true/g' lib/pages/premiumPage.dart
+          sed -i 's/appStateSettings\["purchased"\] = false/appStateSettings\["purchased"\] = true/g' lib/pages/premiumPage.dart
+          sed -i 's/"purchased": false/"purchased": true/g' lib/struct/defaultPreferences.dart
 
       - name: Install dependencies
         working-directory: ./budget
@@ -40,5 +46,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Cashew-1Money-Edition
+          name: Cashew-1Money-Pro-Edition
           path: budget/build/app/outputs/flutter-apk/app-release.apk
