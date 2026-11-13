@@ -1,21 +1,15 @@
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
 import 'package:budget/colors.dart';
 import 'package:budget/database/tables.dart';
 import 'package:budget/functions.dart';
-import 'package:budget/pages/addCategoryPage.dart';
 import 'package:budget/pages/addTransactionPage.dart';
 import 'package:budget/pages/transactionsSearchPage.dart';
-import 'package:budget/struct/currencyFunctions.dart';
 import 'package:budget/struct/databaseGlobal.dart';
 import 'package:budget/struct/settings.dart';
-import 'package:budget/widgets/categoryIcon.dart';
-import 'package:budget/widgets/openBottomSheet.dart';
-import 'package:budget/widgets/pieChart.dart';
-import 'package:budget/widgets/tappable.dart';
+import 'package:budget/widgets/openContainerNavigation.dart';
+import 'package:budget/widgets/openPopup.dart';
 import 'package:budget/widgets/textWidgets.dart';
-import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 
 class HomePageOneMoneyDial extends StatefulWidget {
   const HomePageOneMoneyDial({super.key});
@@ -25,279 +19,232 @@ class HomePageOneMoneyDial extends StatefulWidget {
 }
 
 class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
-  DateTime selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
-  String? selectedWalletPk; // null = كل الحسابات
-  bool isExpense = true; // true = المصروفات، false = الدخل
+  bool showIncome = false;
+  String? selectedWalletPk;
 
-  void _changeMonth(int delta) {
-    setState(() {
-      selectedMonth = DateTime(selectedMonth.year, selectedMonth.month + delta);
-    });
+  Color _parseColor(String? hexString) {
+    if (hexString == null || hexString.isEmpty) return const Color(0xFF4CAF50);
+    return HexColor(hexString);
   }
 
-  DateTime get _startOfMonth =>
-      DateTime(selectedMonth.year, selectedMonth.month, 1);
-
-  DateTime get _endOfMonth =>
-      DateTime(selectedMonth.year, selectedMonth.month + 1, 0, 23, 59, 59);
+  String _formatAmount(double amount) {
+    if (amount == amount.roundToDouble()) {
+      return amount.toStringAsFixed(0);
+    }
+    return amount.toStringAsFixed(2);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final allWallets = Provider.of<AllWallets>(context);
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-    return StreamBuilder<List<TransactionCategory>>(
-      stream: database.watchAllCategories(),
-      builder: (context, catSnapshot) {
-        if (!catSnapshot.hasData) return const SizedBox.shrink();
+    return StreamBuilder<List<TransactionWallet>>(
+      stream: database.getAllPinnedWallets(HomePageWidgetDisplay.WalletList).$1,
+      builder: (context, walletSnap) {
+        final wallets = walletSnap.data ?? [];
+        if (wallets.isNotEmpty && selectedWalletPk == null) {
+          selectedWalletPk = appStateSettings["selectedWalletPk"] ?? wallets.first.walletPk;
+        }
 
-        // تصفية الفئات حسب النوع (مصروفات أو دخل) واستبعاد فئات التحويل
-        final categories = catSnapshot.data!
-            .where((c) => c.income == !isExpense)
-            .toList();
+        return StreamBuilder<List<TransactionCategory>>(
+          stream: database.watchAllCategories(),
+          builder: (context, catSnap) {
+            final allCategories = catSnap.data ?? [];
+            final categories = allCategories.where((c) => c.income == showIncome).toList();
 
-        return StreamBuilder<List<Transaction>>(
-          stream: database.getTransactionsInTimeRangeFromCategories(
-            _startOfMonth,
-            _endOfMonth,
-            null,
-            null,
-            true,
-            null,
-            null,
-            null,
-          ),
-          builder: (context, txSnapshot) {
-            final transactions = (txSnapshot.data ?? []).where((tx) {
-              if (tx.paid == false) return false;
-              if (selectedWalletPk != null && tx.walletFk != selectedWalletPk) {
-                return false;
-              }
-              return isExpense ? tx.amount < 0 : tx.amount > 0;
-            }).toList();
-
-            // حساب إجمالي كل فئة
-            Map<String, double> categoryTotals = {};
-            double totalAmount = 0;
-
-            for (var tx in transactions) {
-              double converted = tx.amount.abs() *
-                  amountRatioToPrimaryCurrencyGivenPk(
-                      allWallets, tx.walletFk);
-              categoryTotals[tx.categoryFk] =
-                  (categoryTotals[tx.categoryFk] ?? 0) + converted;
-              totalAmount += converted;
-            }
-
-            // تجهيز بيانات الدائرة البيانية (Donut Chart)
-            List<PieChartDisplayData> pieData = [];
-            for (var cat in categories) {
-              double val = categoryTotals[cat.categoryPk] ?? 0;
-              if (val > 0) {
-                pieData.add(
-                  PieChartDisplayData(
-                    title: cat.name,
-                    percent: totalAmount > 0 ? (val / totalAmount) * 100 : 0,
-                    color: HexColor(cat.colour),
-                    amount: val,
-                  ),
-                );
-              }
-            }
-
-            // تقسيم الفئات حسب توزيع 1Money (4 فوق، 2 يمين، 2 يسار، والباقي تحت)
-            final topRow = categories.take(4).toList();
-            final rightCol = categories.skip(4).take(2).toList();
-            final leftCol = categories.skip(6).take(2).toList();
-            final bottomGrid = categories.skip(8).toList();
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Column(
-                children: [
-                  // 1. الشريط العلوي: اختيار الحساب والرصيد
-                  _buildHeaderAccountBar(context, allWallets),
-                  const SizedBox(height: 10),
-
-                  // 2. شريط التنقل بين الأشهر
-                  _buildMonthSelector(context),
-                  const SizedBox(height: 18),
-
-                  // 3. الصف العلوي (4 فئات)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: topRow
-                        .map((cat) => Expanded(
-                              child: _buildCategoryNode(
-                                context,
-                                cat,
-                                categoryTotals[cat.categoryPk] ?? 0,
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 4. المنتصف: (يمين: فئتين) + (وسط: الدائرة) + (يسار: فئتين)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // العمود الأيمن
-                      SizedBox(
-                        width: 78,
-                        child: Column(
-                          children: rightCol
-                              .map((cat) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 14),
-                                    child: _buildCategoryNode(
-                                      context,
-                                      cat,
-                                      categoryTotals[cat.categoryPk] ?? 0,
-                                    ),
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-
-                      // الدائرة البيانية في المنتصف (الضغط عليها يبدل بين المصروفات والدخل)
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              isExpense = !isExpense;
-                            });
-                          },
-                          child: SizedBox(
-                            height: 185,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                PieChartWrapper(
-                                  data: pieData.isEmpty
-                                      ? [
-                                          PieChartDisplayData(
-                                            title: "",
-                                            percent: 100,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .surfaceVariant,
-                                            amount: 0,
-                                          )
-                                        ]
-                                      : pieData,
-                                  isDonut: true,
-                                  donutWidth: 16,
-                                ),
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    TextFont(
-                                      text: isExpense ? "النفقات" : "الدخل",
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    TextFont(
-                                      text: convertToMoney(
-                                          allWallets, totalAmount),
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      textColor: isExpense
-                                          ? getColor(context, "expenseAmount")
-                                          : getColor(context, "incomeAmount"),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    TextFont(
-                                      text: "اضغط للتبديل",
-                                      fontSize: 10,
-                                      textColor: getColor(context, "textLight"),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // العمود الأيسر
-                      SizedBox(
-                        width: 78,
-                        child: Column(
-                          children: leftCol
-                              .map((cat) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 14),
-                                    child: _buildCategoryNode(
-                                      context,
-                                      cat,
-                                      categoryTotals[cat.categoryPk] ?? 0,
-                                    ),
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  // 5. باقي الفئات + زر إضافة فئة (+)
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 14,
-                    alignment: WrapAlignment.start,
-                    children: [
-                      ...bottomGrid.map(
-                        (cat) => SizedBox(
-                          width: (MediaQuery.of(context).size.width - 64) / 4,
-                          child: _buildCategoryNode(
-                            context,
-                            cat,
-                            categoryTotals[cat.categoryPk] ?? 0,
-                          ),
-                        ),
-                      ),
-                      // زر + لإضافة فئة جديدة
-                      SizedBox(
-                        width: (MediaQuery.of(context).size.width - 64) / 4,
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 24),
-                            Tappable(
-                              onTap: () {
-                                pushRoute(
-                                  context,
-                                  AddCategoryPage(
-                                    routesToPopAfterDelete:
-                                        RoutesToPopAfterDelete.None,
-                                  ),
-                                );
-                              },
-                              borderRadius: 50,
-                              child: Container(
-                                width: 52,
-                                height: 52,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: getColor(context, "textLight")
-                                        .withOpacity(0.4),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.add_rounded,
-                                  color: getColor(context, "textLight"),
-                                  size: 26,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            return StreamBuilder<List<Transaction>>(
+              stream: database.getTransactionsInTimeRangeFromCategories(
+                startOfMonth,
+                endOfMonth,
+                null,
+                null,
+                true,
+                null,
+                null,
+                null,
               ),
+              builder: (context, transSnap) {
+                final transactions = transSnap.data ?? [];
+
+                Map<String, double> categoryTotals = {};
+                double totalExpense = 0;
+                double totalIncome = 0;
+
+                for (var t in transactions) {
+                  if (!t.paid) continue;
+                  if (selectedWalletPk != null && t.walletFk != selectedWalletPk) continue;
+
+                  if (t.income) {
+                    totalIncome += t.amount.abs();
+                  } else {
+                    totalExpense += t.amount.abs();
+                  }
+
+                  if (t.income == showIncome) {
+                    categoryTotals[t.categoryFk] =
+                        (categoryTotals[t.categoryFk] ?? 0) + t.amount.abs();
+                  }
+                }
+
+                final double activeTotal = showIncome ? totalIncome : totalExpense;
+
+                // تقسيم الفئات: أول 8 فئات تحيط بالدائرة البيانية (أسلوب 1Money الأصلي) والباقي في شبكة سفلية
+                final dialCategories = categories.take(8).toList();
+                final extraCategories = categories.skip(8).toList();
+
+                List<_DialSegment> segments = [];
+                for (var cat in categories) {
+                  final amt = categoryTotals[cat.categoryPk] ?? 0;
+                  if (amt > 0) {
+                    segments.add(_DialSegment(amount: amt, color: _parseColor(cat.colour)));
+                  }
+                }
+
+                return Column(
+                  children: [
+                    // 1. شريط اختيار المحفظة والتبديل بين المصروفات والدخل
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          if (wallets.isNotEmpty)
+                            Expanded(
+                              child: SizedBox(
+                                height: 38,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: wallets.length + 1,
+                                  itemBuilder: (context, idx) {
+                                    if (idx == 0) {
+                                      final isAll = selectedWalletPk == null;
+                                      return Padding(
+                                        padding: const EdgeInsets.only(left: 6),
+                                        child: ChoiceChip(
+                                          label: const Text("الكل"),
+                                          selected: isAll,
+                                          onSelected: (_) => setState(() => selectedWalletPk = null),
+                                        ),
+                                      );
+                                    }
+                                    final w = wallets[idx - 1];
+                                    final isSel = w.walletPk == selectedWalletPk;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(left: 6),
+                                      child: ChoiceChip(
+                                        label: Text(w.name),
+                                        selected: isSel,
+                                        onSelected: (_) => setState(() => selectedWalletPk = w.walletPk),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // 2. القرص الدائري التفاعلي (1Money Circular Dial)
+                    SizedBox(
+                      height: 350,
+                      width: double.infinity,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final center = Offset(constraints.maxWidth / 2, constraints.maxHeight / 2);
+                          const double orbitRadius = 122.0;
+
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // الحلقة البيانية في المنتصف
+                              GestureDetector(
+                                onTap: () => setState(() => showIncome = !showIncome),
+                                child: SizedBox(
+                                  width: 145,
+                                  height: 145,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      CustomPaint(
+                                        size: const Size(145, 145),
+                                        painter: _OneMoneyRingPainter(segments: segments),
+                                      ),
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          TextFont(
+                                            text: showIncome ? "الدخل" : "المصروفات",
+                                            fontSize: 12,
+                                            textColor: Colors.grey,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          TextFont(
+                                            text: "${_formatAmount(activeTotal)} د.ل",
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            textColor: showIncome ? Colors.green : Colors.redAccent,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          TextFont(
+                                            text: "اضغط للتبديل",
+                                            fontSize: 10,
+                                            textColor: Colors.grey.withOpacity(0.7),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              // الأيقونات المحيطة بالدائرة (8 فئات رئيسية)
+                              ...List.generate(dialCategories.length, (index) {
+                                final cat = dialCategories[index];
+                                final angle = (2 * math.pi * index / dialCategories.length) - (math.pi / 2);
+                                final dx = center.dx + orbitRadius * math.cos(angle) - 38;
+                                final dy = center.dy + orbitRadius * math.sin(angle) - 38;
+                                final spent = categoryTotals[cat.categoryPk] ?? 0;
+
+                                return Positioned(
+                                  left: dx,
+                                  top: dy,
+                                  width: 76,
+                                  height: 76,
+                                  child: _buildCategoryNode(context, cat, spent),
+                                );
+                              }),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+
+                    // 3. بقية الفئات في شبكة مرتبة بالأسفل
+                    if (extraCategories.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 8,
+                            childAspectRatio: 0.85,
+                          ),
+                          itemCount: extraCategories.length,
+                          itemBuilder: (context, index) {
+                            final cat = extraCategories[index];
+                            final spent = categoryTotals[cat.categoryPk] ?? 0;
+                            return _buildCategoryNode(context, cat, spent);
+                          },
+                        ),
+                      ),
+                  ],
+                );
+              },
             );
           },
         );
@@ -305,234 +252,113 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
     );
   }
 
-  /// شريط اختيار الحساب والرصيد في الأعلى (مثل 1Money)
-  Widget _buildHeaderAccountBar(BuildContext context, AllWallets allWallets) {
-    final currentWallet = selectedWalletPk != null
-        ? allWallets.indexedByPk[selectedWalletPk]
-        : null;
-
-    return StreamBuilder<double?>(
-      stream: database.watchTotalOfWallet(
-        selectedWalletPk == null ? null : [selectedWalletPk!],
-        isPaid: true,
-        allWallets: allWallets,
-        followCustomPeriodCycle: false,
-        cycleSettingsExtension: "",
-      ),
-      builder: (context, balanceSnapshot) {
-        final balance = balanceSnapshot.data ?? 0;
-
-        return Tappable(
-          onTap: () {
-            // فتح قائمة اختيار الحساب
-            _showWalletPickerSheet(context, allWallets);
-          },
-          borderRadius: 14,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFont(
-                      text: currentWallet?.name ?? "كل الحسابات",
-                      fontSize: 14,
-                      textColor: getColor(context, "textLight"),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 18,
-                      color: getColor(context, "textLight"),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                TextFont(
-                  text: convertToMoney(
-                    allWallets,
-                    balance,
-                    currencyKey: currentWallet?.currency,
-                  ),
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// شريط التنقل بين الأشهر (< نوفمبر 2026 >)
-  Widget _buildMonthSelector(BuildContext context) {
-    final monthLabel = DateFormat('MMMM yyyy', context.locale.toString())
-        .format(selectedMonth);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        IconButton(
-          onPressed: () => _changeMonth(-1),
-          icon: const Icon(Icons.keyboard_double_arrow_right_rounded),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFont(
-                text: monthLabel,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-              const SizedBox(width: 4),
-              const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-            ],
-          ),
-        ),
-        IconButton(
-          onPressed: () => _changeMonth(1),
-          icon: const Icon(Icons.keyboard_double_arrow_left_rounded),
-        ),
-      ],
-    );
-  }
-
-  /// عنصر الفئة الواحدة (الاسم + الأيقونة الدائرية + المبلغ)
-  Widget _buildCategoryNode(
-    BuildContext context,
-    TransactionCategory category,
-    double spentAmount,
-  ) {
-    final allWallets = Provider.of<AllWallets>(context, listen: false);
-    final catColor = HexColor(category.colour);
-
-    return GestureDetector(
-      // الضغط المباشر -> فتح الإدخال الفوري (1Money Style)
+  Widget _buildCategoryNode(BuildContext context, TransactionCategory cat, double spent) {
+    final catColor = _parseColor(cat.colour);
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
       onTap: () {
-        HapticFeedback.lightImpact();
-        openBottomSheet(
+        pushRoute(
           context,
-          fullSnap: true,
           AddTransactionPage(
             routesToPopAfterDelete: RoutesToPopAfterDelete.None,
-            selectedCategory: category,
-            selectedWallet: selectedWalletPk != null
-                ? allWallets.indexedByPk[selectedWalletPk]
-                : null,
-            selectedIncome: !isExpense,
+            selectedCategory: cat,
           ),
         );
       },
-      // الضغط المطول -> عرض معاملات هذه الفئة
       onLongPress: () {
-        HapticFeedback.mediumImpact();
         pushRoute(
           context,
           TransactionsSearchPage(
             initialFilters: SearchFilters(
-              categoryPks: [category.categoryPk],
+              categoryPks: [cat.categoryPk],
             ),
           ),
         );
       },
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          TextFont(
-            text: category.name,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+          Text(
+            cat.name,
             maxLines: 1,
-            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           Container(
-            width: 52,
-            height: 52,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: catColor.withOpacity(0.16),
+              color: spent > 0 ? catColor : catColor.withOpacity(0.18),
             ),
-            child: Center(
-              child: CategoryIcon(
-                categoryPk: category.categoryPk,
-                size: 26,
-                category: category,
-                canEditByLongPress: false,
-                noBackground: true,
-              ),
+            padding: const EdgeInsets.all(10),
+            child: Image.asset(
+              "assets/categories/${cat.iconName ?? 'cash-bill-dollar.png'}",
+              color: spent > 0 ? Colors.white : null,
+              fit: BoxFit.contain,
             ),
           ),
-          const SizedBox(height: 5),
-          TextFont(
-            text: convertToMoney(allWallets, spentAmount, decimals: 0),
-            fontSize: 12,
-            fontWeight: spentAmount > 0 ? FontWeight.bold : FontWeight.normal,
-            textColor: spentAmount > 0
-                ? catColor
-                : getColor(context, "textLight"),
-            maxLines: 1,
+          const SizedBox(height: 3),
+          Text(
+            spent > 0 ? _formatAmount(spent) : "0",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: spent > 0 ? FontWeight.bold : FontWeight.normal,
+              color: spent > 0 ? catColor : Colors.grey,
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  /// نافذة اختيار الحساب السريعة
-  void _showWalletPickerSheet(BuildContext context, AllWallets allWallets) {
-    openBottomSheet(
-      context,
-      Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const TextFont(
-              text: "اختر الحساب",
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              leading: const Icon(Icons.account_balance_wallet_rounded),
-              title: const TextFont(text: "كل الحسابات", fontSize: 16),
-              trailing: selectedWalletPk == null
-                  ? const Icon(Icons.check_circle_rounded, color: Colors.green)
-                  : null,
-              onTap: () {
-                setState(() => selectedWalletPk = null);
-                Navigator.pop(context);
-              },
-            ),
-            ...allWallets.list.map((wallet) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: HexColor(wallet.colour).withOpacity(0.2),
-                    child: Icon(
-                      Icons.credit_card_rounded,
-                      color: HexColor(wallet.colour),
-                    ),
-                  ),
-                  title: TextFont(text: wallet.name, fontSize: 16),
-                  trailing: selectedWalletPk == wallet.walletPk
-                      ? const Icon(Icons.check_circle_rounded,
-                          color: Colors.green)
-                      : null,
-                  onTap: () {
-                    setState(() => selectedWalletPk = wallet.walletPk);
-                    Navigator.pop(context);
-                  },
-                )),
-          ],
-        ),
-      ),
-    );
+class _DialSegment {
+  final double amount;
+  final Color color;
+  _DialSegment({required this.amount, required this.color});
+}
+
+class _OneMoneyRingPainter extends CustomPainter {
+  final List<_DialSegment> segments;
+  _OneMoneyRingPainter({required this.segments});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 8;
+    const strokeWidth = 14.0;
+
+    final bgPaint = Paint()
+      ..color = Colors.grey.withOpacity(0.15)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    canvas.drawCircle(center, radius, bgPaint);
+
+    double total = segments.fold(0, (sum, item) => sum + item.amount);
+    if (total <= 0) return;
+
+    double startAngle = -math.pi / 2;
+    for (var seg in segments) {
+      final sweepAngle = (seg.amount / total) * 2 * math.pi;
+      final paint = Paint()
+        ..color = seg.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        math.max(0.01, sweepAngle - 0.03),
+        false,
+        paint,
+      );
+      startAngle += sweepAngle;
+    }
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
