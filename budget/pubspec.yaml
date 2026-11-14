@@ -116,6 +116,9 @@ flutter_icons:
     theme_color: "#5f85c2"
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  path_provider_platform_interface: ^2.1.1
   drift_dev: ^2.14.0
   build_runner: ^2.4.7
 
@@ -208,3 +211,4 @@ flutter:
     - family: Icons
       fonts:
         - asset: assets/icons/Icons.ttf
+
