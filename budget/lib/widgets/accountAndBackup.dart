@@ -28,6 +28,7 @@ import 'package:budget/widgets/tappable.dart';
 import 'package:budget/widgets/textWidgets.dart';
 import 'package:budget/widgets/util/saveFile.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -133,11 +134,15 @@ Future<bool> signInGoogle(
           ? signIn.GoogleSignIn(
               clientId: DefaultFirebaseOptions.currentPlatform.iosClientId,
               scopes: scopes)
-          : signIn.GoogleSignIn(
-              serverClientId:
-                  '841712811516-t1io8s0r7rgthloqv1csbc5p7m4ffetf.apps.googleusercontent.com',
-              scopes: scopes,
-            );
+          : getPlatform() == PlatformOS.isAndroid
+              // The Google Services Gradle plugin supplies default_web_client_id
+              // from google-services.json. Keep Android OAuth config in one place.
+              ? signIn.GoogleSignIn(scopes: scopes)
+              : signIn.GoogleSignIn(
+                  serverClientId:
+                      '841712811516-t1io8s0r7rgthloqv1csbc5p7m4ffetf.apps.googleusercontent.com',
+                  scopes: scopes,
+                );
       // googleSignIn?.currentUser?.clearAuthCache();
 
       final signIn.GoogleSignInAccount? account = silentSignIn == true
@@ -231,11 +236,18 @@ Future<bool> testIfHasGmailAccess() async {
 }
 
 Future<bool> signOutGoogle() async {
-  await googleSignIn?.signOut();
-  googleUser = null;
-  await updateSettings("currentUserEmail", "", updateGlobalState: false);
-  await updateSettings("hasSignedIn", false, updateGlobalState: false);
-  refreshUIAfterLoginChange();
+  try {
+    await googleSignIn?.signOut();
+  } finally {
+    try {
+      await FirebaseAuth.instance.signOut();
+    } finally {
+      googleUser = null;
+      await updateSettings("currentUserEmail", "", updateGlobalState: false);
+      await updateSettings("hasSignedIn", false, updateGlobalState: false);
+      refreshUIAfterLoginChange();
+    }
+  }
   print("Signedout");
   return true;
 }
@@ -1569,3 +1581,4 @@ bool openBackupReminderPopupCheck(BuildContext context) {
   }
   return false;
 }
+
