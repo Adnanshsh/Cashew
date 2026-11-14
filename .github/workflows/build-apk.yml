@@ -3,10 +3,12 @@ name: Build Cashew 1Money APK
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -16,7 +18,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -31,49 +33,15 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Setup Permanent Keystore & Print SHA Fingerprints
-        run: |
-          mkdir -p ~/.android
-          KEYSTORE_FILE="budget/android/app/debug.keystore"
+      # Never generate a new signing key during a build. A new certificate must
+      # first be registered in Firebase/Google Cloud, or Google login fails (10).
+      - name: Test Google Sign-In configuration validator
+        run: python3 -m unittest discover -s scripts/tests -v
 
-          if [ ! -f "$KEYSTORE_FILE" ]; then
-            echo "Generating permanent debug.keystore for the first time..."
-            keytool -genkeypair -v \
-              -keystore "$KEYSTORE_FILE" \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add "$KEYSTORE_FILE"
-            git commit -m "chore: save permanent debug.keystore for Google Sign-In [skip ci]" || true
-            git push origin HEAD:${{ github.ref_name }} || true
-          else
-            echo "Using existing permanent debug.keystore from repository."
-          fi
-
-          cp "$KEYSTORE_FILE" ~/.android/debug.keystore
-
-          SHA1=$(keytool -list -v -keystore "$KEYSTORE_FILE" -alias androiddebugkey -storepass android -keypass android | grep -i "SHA1:" | sed 's/.*SHA1: //')
-          SHA256=$(keytool -list -v -keystore "$KEYSTORE_FILE" -alias androiddebugkey -storepass android -keypass android | grep -i "SHA256:" | sed 's/.*SHA256: //')
-
-          echo "### 🔑 بصمات التوقيع الثابتة (انسخها إلى Firebase)" >> $GITHUB_STEP_SUMMARY
-          echo "| البيان | القيمة |" >> $GITHUB_STEP_SUMMARY
-          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Package Name** | \`com.budget.tracker_app\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **SHA-1** | \`$SHA1\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **SHA-256** | \`$SHA256\` |" >> $GITHUB_STEP_SUMMARY
-
-          echo "=========================================="
-          echo "PACKAGE: com.budget.tracker_app"
-          echo "SHA-1:   $SHA1"
-          echo "SHA-256: $SHA256"
-          echo "=========================================="
+      - name: Check Google Sign-In certificate registration
+        id: google_sign_in
+        continue-on-error: true
+        run: python3 scripts/validate_android_google_sign_in.py
 
       - name: Get Flutter Dependencies
         working-directory: budget
@@ -83,8 +51,27 @@ jobs:
         working-directory: budget
         run: flutter build apk --release --no-tree-shake-icons
 
+      - name: Verify APK signing certificate
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          "$APKSIGNER" verify --print-certs budget/build/app/outputs/flutter-apk/app-release.apk > apk-certificate.txt
+          cat apk-certificate.txt
+          # apksigner versions use different signer prefixes (e.g. "V2 Signer:").
+          # Deduplicate the same certificate reported for multiple schemes.
+          APK_SHA1=$(sed -n 's/^.*certificate SHA-1 digest: //p' apk-certificate.txt | tr '[:upper:]' '[:lower:]' | sort -u)
+          KEY_SHA1=$(keytool -exportcert -keystore budget/android/app/debug.keystore -alias androiddebugkey -storepass android | sha1sum | cut -d ' ' -f 1)
+          test -n "$APK_SHA1" && test "$APK_SHA1" = "$KEY_SHA1"
+
+      - name: Require matching Google OAuth configuration before distributing APK
+        if: steps.google_sign_in.outcome != 'success'
+        run: |
+          echo "::error::The APK compiled, but Google Sign-In configuration is invalid. Follow docs/android-google-sign-in.md before distributing it."
+          exit 1
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Cashew-1Money-Release-APK
           path: budget/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+

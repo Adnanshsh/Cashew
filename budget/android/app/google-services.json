@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "841712811516-8ligir1tnekqal3nodor2kelph97e3tf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.budget.tracker_app",
+            "certificate_hash": "55f83c11848aff59f92876bf3c275a2f47ffe2de"
+          }
+        },
+        {
           "client_id": "841712811516-clfun1ndbvdr2up5h7ou9f1tero881la.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
