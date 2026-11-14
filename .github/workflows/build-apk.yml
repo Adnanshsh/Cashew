@@ -1,50 +1,90 @@
-name: Build Custom Cashew APK
+name: Build Cashew 1Money APK
 
 on:
-  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Set up Java
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Set up Flutter 3.19.6
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.6'
           channel: 'stable'
+          cache: true
 
-      - name: Unlock Cashew Pro & Fixed Signing
-        working-directory: ./budget
+      - name: Setup Permanent Keystore & Print SHA Fingerprints
         run: |
-          rm -f android/app/debug.keystore
-          keytool -genkey -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1
-          sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/g' android/app/build.gradle
-          sed -i 's/appStateSettings\["purchased"\] == true/true/g' lib/pages/premiumPage.dart
-          sed -i 's/appStateSettings\["purchased"\] = false/appStateSettings\["purchased"\] = true/g' lib/pages/premiumPage.dart
-          sed -i 's/"purchased": false/"purchased": true/g' lib/struct/defaultPreferences.dart
+          mkdir -p ~/.android
+          KEYSTORE_FILE="budget/android/app/debug.keystore"
 
-      - name: Install dependencies
-        working-directory: ./budget
+          if [ ! -f "$KEYSTORE_FILE" ]; then
+            echo "Generating permanent debug.keystore for the first time..."
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_FILE" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$KEYSTORE_FILE"
+            git commit -m "chore: save permanent debug.keystore for Google Sign-In [skip ci]" || true
+            git push origin HEAD:${{ github.ref_name }} || true
+          else
+            echo "Using existing permanent debug.keystore from repository."
+          fi
+
+          cp "$KEYSTORE_FILE" ~/.android/debug.keystore
+
+          SHA1=$(keytool -list -v -keystore "$KEYSTORE_FILE" -alias androiddebugkey -storepass android -keypass android | grep -i "SHA1:" | sed 's/.*SHA1: //')
+          SHA256=$(keytool -list -v -keystore "$KEYSTORE_FILE" -alias androiddebugkey -storepass android -keypass android | grep -i "SHA256:" | sed 's/.*SHA256: //')
+
+          echo "### 🔑 بصمات التوقيع الثابتة (انسخها إلى Firebase)" >> $GITHUB_STEP_SUMMARY
+          echo "| البيان | القيمة |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Package Name** | \`com.budget.tracker_app\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **SHA-1** | \`$SHA1\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **SHA-256** | \`$SHA256\` |" >> $GITHUB_STEP_SUMMARY
+
+          echo "=========================================="
+          echo "PACKAGE: com.budget.tracker_app"
+          echo "SHA-1:   $SHA1"
+          echo "SHA-256: $SHA256"
+          echo "=========================================="
+
+      - name: Get Flutter Dependencies
+        working-directory: budget
         run: flutter pub get
 
-      - name: Build APK (Release)
-        working-directory: ./budget
+      - name: Build Release APK
+        working-directory: budget
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Cashew-1Money-Pro-Edition
+          name: Cashew-1Money-Release-APK
           path: budget/build/app/outputs/flutter-apk/app-release.apk
