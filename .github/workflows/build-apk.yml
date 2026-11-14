@@ -56,7 +56,9 @@ jobs:
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
           "$APKSIGNER" verify --print-certs budget/build/app/outputs/flutter-apk/app-release.apk > apk-certificate.txt
           cat apk-certificate.txt
-          APK_SHA1=$(sed -n 's/^Signer #1 certificate SHA-1 digest: //p' apk-certificate.txt)
+          # apksigner versions use different signer prefixes (e.g. "V2 Signer:").
+          # Deduplicate the same certificate reported for multiple schemes.
+          APK_SHA1=$(sed -n 's/^.*certificate SHA-1 digest: //p' apk-certificate.txt | tr '[:upper:]' '[:lower:]' | sort -u)
           KEY_SHA1=$(keytool -exportcert -keystore budget/android/app/debug.keystore -alias androiddebugkey -storepass android | sha1sum | cut -d ' ' -f 1)
           test -n "$APK_SHA1" && test "$APK_SHA1" = "$KEY_SHA1"
 
