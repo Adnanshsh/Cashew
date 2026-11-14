@@ -133,7 +133,11 @@ Future<bool> signInGoogle(
           ? signIn.GoogleSignIn(
               clientId: DefaultFirebaseOptions.currentPlatform.iosClientId,
               scopes: scopes)
-          : signIn.GoogleSignIn.standard(scopes: scopes);
+          : signIn.GoogleSignIn(
+              serverClientId:
+                  '841712811516-t1io8s0r7rgthloqv1csbc5p7m4ffetf.apps.googleusercontent.com',
+              scopes: scopes,
+            );
       // googleSignIn?.currentUser?.clearAuthCache();
 
       final signIn.GoogleSignInAccount? account = silentSignIn == true
@@ -177,7 +181,7 @@ Future<bool> signInGoogle(
     openSnackbar(
       SnackbarMessage(
         title: "sign-in-error".tr(),
-        description: "sign-in-error-description".tr(),
+        description: e.toString(),
         icon: appStateSettings["outlinedIcons"]
             ? Icons.error_outlined
             : Icons.error_rounded,
