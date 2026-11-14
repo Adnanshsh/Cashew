@@ -47,6 +47,10 @@ jobs:
         working-directory: budget
         run: flutter pub get
 
+      - name: Test Native Database Responsiveness and Persistence
+        working-directory: budget
+        run: flutter test test/native_database_test.dart
+
       - name: Build Release APK
         working-directory: budget
         run: flutter build apk --release --no-tree-shake-icons
@@ -74,4 +78,5 @@ jobs:
           name: Cashew-1Money-Release-APK
           path: budget/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+
 
