@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "841712811516-odqsrf1kkonmulk0hanr8mbimqdqk1ai.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.budget.tracker_app",
+            "certificate_hash": "45dbfb5fb63ef3b0a024583f980340041c36acbb"
+          }
+        },
+        {
           "client_id": "841712811516-t1io8s0r7rgthloqv1csbc5p7m4ffetf.apps.googleusercontent.com",
           "client_type": 3
         }
