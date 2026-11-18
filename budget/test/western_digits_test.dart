@@ -2,7 +2,7 @@ import 'package:budget/struct/westernDigits.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 import 'package:intl/number_symbols.dart';
 import 'package:intl/number_symbols_data.dart';
 
