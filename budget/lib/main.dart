@@ -7,6 +7,7 @@ import 'package:budget/struct/keyboardIntents.dart';
 import 'package:budget/struct/logging.dart';
 import 'package:budget/widgets/fadeIn.dart';
 import 'package:budget/struct/languageMap.dart';
+import 'package:budget/struct/westernDigits.dart';
 import 'package:budget/struct/initializeBiometrics.dart';
 import 'package:budget/widgets/util/appLinks.dart';
 import 'package:budget/widgets/util/onAppResume.dart';
@@ -44,6 +45,8 @@ bool allowDangerousDebugFlags = kDebugMode;
 void main() async {
   captureLogs(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    // Set the numeric policy before Material/Intl cache any locale formatters.
+    await initializeWesternDigits();
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
