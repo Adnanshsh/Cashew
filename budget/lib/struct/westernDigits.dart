@@ -8,6 +8,7 @@ Future<void>? _initialization;
 // Capture the original digit ranges before replacing the mutable intl symbols.
 // Keep them available when parsing older exports or localized keyboard input.
 final Set<int> _nativeZeroDigits = numberFormatSymbols.values
+    .cast<NumberSymbols>()
     .map((symbols) => symbols.ZERO_DIGIT.runes.single)
     .where((zero) => zero != 0x30)
     .toSet();
@@ -32,7 +33,8 @@ Future<void> _initializeWesternDigits() async {
 
   final nativeZeros = _nativeZeroDigits;
 
-  numberFormatSymbols.updateAll((locale, symbols) {
+  final symbolsByLocale = numberFormatSymbols.cast<String, NumberSymbols>();
+  symbolsByLocale.updateAll((locale, symbols) {
     // Some scientific exponent symbols contain literal native digits (e.g. fa).
     final exponent = _replaceDigits(symbols.EXP_SYMBOL, nativeZeros);
     if (symbols.ZERO_DIGIT == '0' && exponent == symbols.EXP_SYMBOL) {

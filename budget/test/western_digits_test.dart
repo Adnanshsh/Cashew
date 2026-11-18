@@ -18,6 +18,7 @@ void main() {
   setUpAll(() async {
     originalArabicSymbols = numberFormatSymbols['ar']!;
     nativeZeros = numberFormatSymbols.values
+        .cast<NumberSymbols>()
         .map((symbols) => symbols.ZERO_DIGIT.runes.single)
         .where((zero) => zero != 0x30)
         .toSet();
