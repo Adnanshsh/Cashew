@@ -1,3 +1,4 @@
+import 'package:budget/struct/expense_tools/expense_tools.dart';
 import 'package:budget/pages/oneMoneyPage.dart';
 import 'package:animations/animations.dart';
 import 'package:budget/colors.dart';
@@ -427,6 +428,7 @@ class PageNavigationFrameworkState extends State<PageNavigationFramework> {
 
       await setDailyNotifications(context);
       await initializeDefaultDatabase();
+      ExpenseTools.onReady();
       runNotificationPayLoads(context);
       runQuickActionsPayLoads(context);
       initializeLocalizedMonthNames();

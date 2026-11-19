@@ -1,3 +1,4 @@
+import 'package:budget/struct/expense_tools/expense_tools.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/pages/accountsPage.dart';
 import 'package:budget/pages/autoTransactionsPageEmail.dart';
@@ -58,6 +59,7 @@ void main() async {
     await loadCurrencyJSON();
     await loadLanguageNamesJSON();
     await initializeSettings();
+    await ExpenseTools.initialize();
     tz.initializeTimeZones();
     final String? locationName = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(locationName ?? "America/New_York"));
@@ -153,6 +155,7 @@ class App extends StatelessWidget {
           updateGlobalAppLifecycleState: true,
           onAppResume: () async {
             await setHighRefreshRate();
+            await ExpenseTools.onResume();
           },
           child: InitializeBiometrics(
             child: InitializeNotificationService(

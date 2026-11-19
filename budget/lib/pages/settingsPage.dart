@@ -1727,7 +1727,7 @@ class NumberPadHapticFeedbackSetting extends StatelessWidget {
           : Symbols.vibration_rounded,
       initialValue: appStateSettings["numberPadHapticFeedback"] == true,
       onSwitched: (value) async {
-        if (value == true) HapticFeedback.heavyImpact();
+        if (value == true) HapticFeedback.selectionClick();
         await updateSettings(
           "numberPadHapticFeedback",
           value,

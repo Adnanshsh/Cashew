@@ -105,6 +105,8 @@ class AddTransactionPage extends StatefulWidget {
     this.selectedNotes,
     this.startInitialAddTransactionSequence = true,
     this.transferBalancePopup = false,
+    this.transactionPkOverride,
+    this.onTransactionSaved,
     required this.routesToPopAfterDelete,
   }) : super(key: key);
 
@@ -125,6 +127,8 @@ class AddTransactionPage extends StatefulWidget {
   final String? selectedNotes;
   final bool startInitialAddTransactionSequence;
   final bool transferBalancePopup;
+  final String? transactionPkOverride;
+  final Future<void> Function(Transaction)? onTransactionSaved;
 
   @override
   _AddTransactionPageState createState() => _AddTransactionPageState();
@@ -551,7 +555,8 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       }
 
       final int? rowId = await database.createOrUpdateTransaction(
-        insert: widget.transaction == null,
+        insert:
+            widget.transaction == null && widget.transactionPkOverride == null,
         createdTransaction,
         originalTransaction: widget.transaction,
       );
@@ -559,6 +564,9 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       if (rowId != null) {
         final Transaction transactionJustAdded =
             await database.getTransactionFromRowId(rowId);
+        try {
+          await widget.onTransactionSaved?.call(transactionJustAdded);
+        } catch (_) {/* Inbox reconciles stable SMS IDs on the next refresh. */}
         print("Transaction just added:");
         print(transactionJustAdded);
 
@@ -649,8 +657,9 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     }
 
     Transaction createdTransaction = Transaction(
-      transactionPk:
-          widget.transaction != null ? widget.transaction!.transactionPk : "-1",
+      transactionPk: widget.transaction != null
+          ? widget.transaction!.transactionPk
+          : (widget.transactionPkOverride ?? "-1"),
       pairedTransactionFk: widget.transaction?.pairedTransactionFk,
       name: (selectedTitle ?? "").trim(),
       amount: (selectedIncome || selectedAmount == 0 //Prevent negative 0

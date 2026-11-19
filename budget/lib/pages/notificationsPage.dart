@@ -1,3 +1,4 @@
+import 'package:budget/pages/expense_tools/expense_tools_settings.dart';
 import 'package:budget/struct/settings.dart';
 import 'package:budget/widgets/animatedExpanded.dart';
 import 'package:budget/widgets/notificationsSettings.dart';
@@ -65,6 +66,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             child: Column(
               children: [
                 DailyNotificationsSettings(),
+                ExpenseToolsSettings(),
                 UpcomingTransactionsNotificationsSettings()
               ],
             ),
