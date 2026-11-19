@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:budget/struct/westernDigits.dart';
 
 import 'package:budget/colors.dart';
 import 'package:budget/database/tables.dart';
@@ -1278,6 +1279,7 @@ int? _findListIndexWithMultipleNonEmptyStrings(List<List<String>> lists,
 
 DateTime? tryDateFormatting(
     BuildContext context, String dateFormat, String stringToParse) {
+  stringToParse = toWesternDigits(stringToParse);
   DateFormat format =
       DateFormat(dateFormat.toString(), context.locale.toString());
   DateTime? dateCreated;
@@ -1293,6 +1295,7 @@ DateTime? tryDateFormatting(
 
 DateTime tryToParseCustomDateFormat(
     BuildContext context, String dateFormat, String stringToParse) {
+  stringToParse = toWesternDigits(stringToParse);
   DateFormat format =
       DateFormat(dateFormat.toString(), context.locale.toString());
   DateTime dateCreated;
