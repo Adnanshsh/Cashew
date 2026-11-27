@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:budget/struct/expense_tools/spending_transactions.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:budget/pages/autoTransactionsPageEmail.dart';
 import 'package:budget/struct/expense_tools/bank_sms_parser.dart';
@@ -70,17 +71,7 @@ class _SpendingPlanState extends State<SpendingPlanPage> {
             .difference(DateTime.now()), () {
       if (mounted) setState(refresh);
     });
-    rows = database
-        .getTransactionsInTimeRangeFromCategories(
-            cycle.start,
-            DateTime(cycle.next.year, cycle.next.month, cycle.next.day - 1),
-            null,
-            ['0'],
-            false,
-            null,
-            null,
-            null,
-            walletPks: [wallet])
+    rows = watchSpendingCycle(database, wallet, cycle)
         .asyncMap((transactions) async {
       final result = calculate(transactions);
       if (ExpenseTools.supported &&

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:budget/struct/expense_tools/spending_transactions.dart';
+import 'package:budget/struct/expense_tools/spending_cycle.dart';
 import 'dart:io';
 
 import 'package:budget/database/platform/native.dart' as native;
@@ -54,8 +56,7 @@ void main() {
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('cashew-native-test-');
     originalPathProvider = PathProviderPlatform.instance;
-    PathProviderPlatform.instance =
-        _TemporaryDocumentsProvider(directory.path);
+    PathProviderPlatform.instance = _TemporaryDocumentsProvider(directory.path);
   });
 
   tearDown(() async {
@@ -88,6 +89,32 @@ void main() {
     }
   });
 
+  test('salary cycle includes unpaid bills and excludes next payday', () async {
+    final db = await openDatabase('salary-cycle');
+    final cycle = SpendingCycle(DateTime(2026, 11, 12), 10);
+    for (final row in [
+      ('purchase', cycle.start, true),
+      ('bill', DateTime(2026, 12, 9), false),
+      ('next', cycle.next, false)
+    ]) {
+      await db.into(db.transactions).insert(Transaction(
+          transactionPk: row.$1,
+          name: row.$1,
+          amount: -10,
+          note: '',
+          categoryFk: 'food',
+          walletFk: 'cash',
+          dateCreated: row.$2,
+          income: false,
+          paid: row.$3,
+          skipPaid: false));
+    }
+    final rows = await watchSpendingCycle(db, 'cash', cycle).first;
+    expect(rows.map((t) => t.transactionPk),
+        unorderedEquals(['purchase', 'bill']));
+    expect(await watchSpendingCycle(db, 'other', cycle).first, isEmpty);
+  });
+
   test('failed transaction rolls back and later writes still work', () async {
     final database = await openDatabase('rollback');
     await _storeSetting(database, '{"state":"before"}');
@@ -100,8 +127,7 @@ void main() {
       throwsA(isA<StateError>()),
     );
 
-    expect((await database.getSettings()).settingsJSON,
-        '{"state":"before"}');
+    expect((await database.getSettings()).settingsJSON, '{"state":"before"}');
     await _storeSetting(database, '{"state":"after"}');
     expect((await database.getSettings()).settingsJSON, '{"state":"after"}');
   });
@@ -136,7 +162,8 @@ void main() {
     await renamed.delete();
   });
 
-  test('a heavy SELECT leaves the main isolate event loop responsive', () async {
+  test('a heavy SELECT leaves the main isolate event loop responsive',
+      () async {
     final database = await openDatabase('responsive');
     // Warm the connection so opening the database cannot provide the only yield.
     await database.customSelect('SELECT 1 AS ready').getSingle();
