@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:budget/pages/expense_tools/spending_plan.dart';
 import 'package:budget/colors.dart';
 import 'package:budget/database/tables.dart';
 import 'package:budget/functions.dart';
@@ -59,6 +60,10 @@ class _CheckWidgetLaunchState extends State<CheckWidgetLaunch> {
     if (!widgetActionThrottler.canProceed()) return;
 
     String widgetPayload = (uri ?? "").toString();
+    if (widgetPayload == "dailySpendingPlan") {
+      pushRoute(context, const SpendingPlanPage());
+      return;
+    }
     if (widgetPayload == "addTransactionWidget") {
       // Add a delay so the keyboard can focus
       Future.delayed(Duration(milliseconds: 50), () {

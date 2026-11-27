@@ -42,7 +42,7 @@ class BankSmsReceiver : BroadcastReceiver() {
         if (parts.any { (it.originatingAddress ?: "").trim().uppercase(Locale.ROOT) != sender }) return
         val body = parts.joinToString("") { it.messageBody ?: "" }
         if (Regex("(?i)\\botp\\b|verification|رمز التحقق|كلمة المرور").containsMatchIn(body)) return
-        if (!Regex("(?i)خصم|سحب|دفع|شراء|مدين|اضاف|إضاف|ايداع|إيداع|دائن|حوالة|تغذية|debit|credit|withdraw|purchase|deposit|received|spent").containsMatchIn(body)) return
+        if (!Regex("(?i)خصم|سحب|دفع|شراء|مدين|اضاف|إضاف|ايداع|إيداع|دائن|حوالة|تغذية|debit|credit|withdraw|purchase|deposit|received|spent|refund|استرداد|ارجاع|إرجاع").containsMatchIn(body)) return
         val timestamp = parts.first().timestampMillis
         val digest = MessageDigest.getInstance("SHA-256").digest("$sender\n$timestamp\n$body".toByteArray())
             .joinToString("") { "%02x".format(it) }

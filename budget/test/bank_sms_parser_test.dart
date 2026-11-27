@@ -30,6 +30,12 @@ void main() {
     expect(result?.amount, 1234.5);
     expect(result?.income, true);
   });
+  test('refunds with a clear amount are credits', () {
+    final refund = parseBankSms('NCB', 'Refunded LYD 35.500 to your card');
+    expect(refund?.income, true);
+    expect(refund?.amount, 35.5);
+    expect(parseBankSms('18888', 'تم استرداد مبلغ ١٢٫٥ دينار')?.income, true);
+  });
   test('exact senders only; lookalikes and unknown banks are rejected', () {
     for (final sender in [
       '+21818888',
