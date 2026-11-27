@@ -83,7 +83,11 @@ class _SpendingPlanState extends State<SpendingPlanPage> {
             walletPks: [wallet])
         .asyncMap((transactions) async {
       final result = calculate(transactions);
-      if (ExpenseTools.supported && mounted) {
+      if (ExpenseTools.supported &&
+          mounted &&
+          (widget.compact
+              ? ModalRoute.of(context)?.isCurrent != false
+              : ModalRoute.of(context)?.isCurrent == true)) {
         final snapshot = [
           DateTime.now().toIso8601String(),
           result.$4.toStringAsFixed(3),
@@ -214,7 +218,8 @@ class _SpendingPlanState extends State<SpendingPlanPage> {
     double received = 0, before = 0, today = 0, reserved = savings;
     final seen = <String>{}, duplicates = <String>{};
     for (final tx in transactions) {
-      if (ignored.contains(tx.categoryFk) ||
+      if (tx.skipPaid ||
+          ignored.contains(tx.categoryFk) ||
           tx.pairedTransactionFk != null ||
           tx.objectiveLoanFk != null ||
           tx.type == TransactionSpecialType.credit ||

@@ -141,17 +141,19 @@ class ExpenseTools {
               ..where((t) => t.transactionPk.equals(message.transactionPk)))
             .getSingleOrNull();
         if (existing != null) return true;
-        return await database.createOrUpdateTransaction(Transaction(
-                transactionPk: message.transactionPk,
-                name: rule.templateName,
-                amount: parsed.income ? parsed.amount : -parsed.amount,
-                note: '',
-                categoryFk: category.categoryPk,
-                walletFk: walletKey,
-                dateCreated: message.date,
-                income: parsed.income,
-                paid: true,
-                skipPaid: false)) !=
+        return await database.createOrUpdateTransaction(
+                Transaction(
+                    transactionPk: message.transactionPk,
+                    name: rule.templateName,
+                    amount: parsed.income ? parsed.amount : -parsed.amount,
+                    note: '',
+                    categoryFk: category.categoryPk,
+                    walletFk: walletKey,
+                    dateCreated: message.date,
+                    income: parsed.income,
+                    paid: true,
+                    skipPaid: false),
+                updateSharedEntry: false) !=
             null;
       });
       if (recorded) await dismissSms(message.id);

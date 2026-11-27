@@ -48,7 +48,7 @@ ParsedBankSms? parseBankSms(String sender, String body) {
   final debit = RegExp(
       r'تم\s+(?:خصم|سحب|دفع)|خصم|سحب|مدين|عملية شراء|تم الشراء|\bdebit(?:ed)?\b|\bwithdraw(?:al|n)?\b|\bpurchase\b|\bspent\b');
   final credit = RegExp(
-      r'تم\s+(?:اضافة|ايداع|تغذية)|اضيف|اضافة|ايداع|دائن|حوالة واردة|\bcredit(?:ed)?\b|\bdeposit(?:ed)?\b|\breceived\b');
+      r'تم\s+(?:اضافة|ايداع|تغذية)|اضيف|اضافة|ايداع|دائن|حوالة واردة|تم استرداد|تم ارجاع مبلغ|\brefund(?:ed)?\b|\bcredit(?:ed)?\b|\bdeposit(?:ed)?\b|\breceived\b');
   final out = debit.firstMatch(text);
   final incoming = credit.firstMatch(text);
   if ((out == null) == (incoming == null)) return null;
