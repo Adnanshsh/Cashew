@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'package:budget/database/tables.dart';
+import 'package:budget/struct/databaseGlobal.dart';
+import 'package:budget/struct/expense_tools/bank_sms_parser.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/pages/addTransactionPage.dart';
 import 'package:budget/pages/expense_tools/bank_sms_page.dart';
@@ -46,6 +49,7 @@ class ExpenseTools {
         await channel.invokeMapMethod<String, dynamic>('consumeLaunch');
     _quickPending = _quickPending || launch?['quick'] == true;
     _bankPending = _bankPending || launch?['bank'] == true;
+    await recordMatchingSms();
     inboxRevision.value++;
     await _openPending();
   }
@@ -103,6 +107,55 @@ class ExpenseTools {
         .toList()
         .reversed
         .toList();
+  }
+
+  static Future<void> recordMatchingSms() async {
+    final enabledSince = appStateSettings['bankSmsAutoSince'];
+    if (!supported ||
+        appStateSettings['bankSmsEnabled'] != true ||
+        enabledSince is! int) return;
+    final rules = await database.getAllScannerTemplates();
+    final mappings = appStateSettings['bankSmsWallets'] as Map? ?? {};
+    for (final message in await pendingSms()) {
+      if (message.date.millisecondsSinceEpoch < enabledSince) continue;
+      final parsed = parseBankSms(message.sender, message.body);
+      final walletKey = mappings[message.sender];
+      if (parsed == null || walletKey is! String) continue;
+      final matches = rules
+          .where((r) =>
+              r.contains.trim().isNotEmpty &&
+              message.body.contains(r.contains) &&
+              (r.walletFk == walletKey || r.walletFk == '-1'))
+          .toList();
+      if (matches.length != 1) continue;
+      final rule = matches.single;
+      final category =
+          await database.getCategoryInstanceOrNull(rule.defaultCategoryFk);
+      final wallet = await database.getWalletInstanceOrNull(walletKey);
+      if (category == null ||
+          category.categoryPk == '0' ||
+          category.income != parsed.income ||
+          wallet?.currency?.toUpperCase() != 'LYD') continue;
+      final recorded = await database.transaction(() async {
+        final existing = await (database.select(database.transactions)
+              ..where((t) => t.transactionPk.equals(message.transactionPk)))
+            .getSingleOrNull();
+        if (existing != null) return true;
+        return await database.createOrUpdateTransaction(Transaction(
+                transactionPk: message.transactionPk,
+                name: rule.templateName,
+                amount: parsed.income ? parsed.amount : -parsed.amount,
+                note: '',
+                categoryFk: category.categoryPk,
+                walletFk: walletKey,
+                dateCreated: message.date,
+                income: parsed.income,
+                paid: true,
+                skipPaid: false)) !=
+            null;
+      });
+      if (recorded) await dismissSms(message.id);
+    }
   }
 
   static Future<void> dismissSms(String id) async {

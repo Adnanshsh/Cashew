@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' hide Column;
 import 'package:budget/database/tables.dart';
 import 'package:budget/functions.dart';
+import 'package:budget/pages/autoTransactionsPageEmail.dart';
 import 'package:budget/pages/addTransactionPage.dart';
 import 'package:budget/struct/databaseGlobal.dart';
 import 'package:budget/struct/expense_tools/bank_sms_parser.dart';
@@ -37,6 +38,7 @@ class _BankSmsPageState extends State<BankSmsPage> {
       final permission =
           await ExpenseTools.channel.invokeMethod<bool>('smsPermission') ??
               false;
+      await ExpenseTools.recordMatchingSms();
       final messages = await ExpenseTools.pendingSms();
       final pending = <BankSmsMessage>[];
       for (final message in messages) {
@@ -138,8 +140,8 @@ class _BankSmsPageState extends State<BankSmsPage> {
                   children: [
                     Text(expenseText(
                         context,
-                        'اقرأ رسائل الخصم والإضافة الجديدة من المرسلين المحددين فقط. كل رسالة تظهر للمراجعة قبل حفظها. فعّل الإذن ثم اربط كل مرسل بالحساب الصحيح.',
-                        'Receive new debit and credit messages from these senders only. Review each transaction before saving. Enable permission and link each sender to its account.')),
+                        'اقرأ رسائل الخصم والإضافة الجديدة من المرسلين المحددين فقط. تظهر الرسائل للمراجعة ما لم تفعّل قواعد التسجيل التلقائي. فعّل الإذن ثم اربط كل مرسل بالحساب الصحيح.',
+                        'Receive new debit and credit messages from these senders only. Messages are reviewed unless automatic rules are enabled. Enable permission and link each sender to its account.')),
                     SwitchListTile(
                       title: Text(expenseText(
                           context,
@@ -171,6 +173,27 @@ class _BankSmsPageState extends State<BankSmsPage> {
                         if (mounted) setState(() => _permission = enabled);
                       },
                     ),
+                    SwitchListTile(
+                        title: Text(expenseText(
+                            context,
+                            'تسجيل الرسائل المطابقة تلقائيًا',
+                            'Automatically record matching messages')),
+                        subtitle: Text(expenseText(
+                            context,
+                            'عند فتح التطبيق تُسجّل الرسائل الجديدة المطابقة لقالب واحد وفئة وحساب بالدينار الليبي. تبقى البقية للمراجعة.',
+                            'On opening the app, new messages matching one template, category and linked LYD account are recorded. Other messages stay in review.')),
+                        value: appStateSettings['bankSmsAutoSince'] is int,
+                        onChanged: (v) async {
+                          await updateSettings('bankSmsAutoSince',
+                              v ? DateTime.now().millisecondsSinceEpoch : null,
+                              updateGlobalState: false);
+                          if (mounted) setState(() {});
+                        }),
+                    ListTile(
+                        title: Text(expenseText(context, 'قوالب التصنيف',
+                            'Classification templates')),
+                        onTap: () => pushRoute(context,
+                            const AutoTransactionsPageNotifications())),
                     for (final entry in bankSmsSenders.entries)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
