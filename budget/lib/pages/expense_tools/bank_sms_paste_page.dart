@@ -1,5 +1,5 @@
 import 'package:budget/database/tables.dart';
-import 'package:budget/functions.dart';
+import 'package:budget/functions.dart' show pushRoute;
 import 'package:budget/pages/addTransactionPage.dart';
 import 'package:budget/struct/databaseGlobal.dart';
 import 'package:budget/struct/expense_tools/bank_sms_parser.dart';

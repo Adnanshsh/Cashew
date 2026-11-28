@@ -7,7 +7,7 @@ import 'dart:io';
 
 import 'package:budget/database/platform/native.dart' as native;
 import 'package:budget/database/tables.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
