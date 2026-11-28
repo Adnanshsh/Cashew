@@ -39,14 +39,22 @@ Throttler widgetActionThrottler =
     Throttler(duration: Duration(milliseconds: 350));
 
 class _CheckWidgetLaunchState extends State<CheckWidgetLaunch> {
+  StreamSubscription<Uri?>? _widgetClicks;
+
   @override
   void initState() {
     super.initState();
     HomeWidget.setAppGroupId('WIDGET_GROUP_ID');
     Future.delayed(Duration(milliseconds: 50), () {
-      _checkForWidgetLaunch();
+      if (mounted) _checkForWidgetLaunch();
     });
-    HomeWidget.widgetClicked.listen(_launchedFromWidget);
+    _widgetClicks = HomeWidget.widgetClicked.listen(_launchedFromWidget);
+  }
+
+  @override
+  void dispose() {
+    _widgetClicks?.cancel();
+    super.dispose();
   }
 
   void _checkForWidgetLaunch() {
@@ -56,10 +64,11 @@ class _CheckWidgetLaunchState extends State<CheckWidgetLaunch> {
   // For some reason, older Android versions open an entirely new app instance... weird!
   // has this been fixed with: android:launchMode="singleInstance" ?
   void _launchedFromWidget(Uri? uri) async {
-    // Only perform one widget action per launch/continue of the app
+    if (!mounted || uri == null) return;
+    // Only perform one widget action per launch/continue of the app.
     if (!widgetActionThrottler.canProceed()) return;
 
-    String widgetPayload = (uri ?? "").toString();
+    final widgetPayload = uri.toString();
     if (widgetPayload == "dailySpendingPlan") {
       pushRoute(context, const SpendingPlanPage());
       return;
@@ -67,6 +76,7 @@ class _CheckWidgetLaunchState extends State<CheckWidgetLaunch> {
     if (widgetPayload == "addTransactionWidget") {
       // Add a delay so the keyboard can focus
       Future.delayed(Duration(milliseconds: 50), () {
+        if (!mounted) return;
         pushRoute(
           context,
           AddTransactionPage(
