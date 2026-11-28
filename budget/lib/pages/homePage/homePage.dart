@@ -1,4 +1,5 @@
 import 'package:budget/colors.dart';
+import 'package:budget/pages/expense_tools/spending_plan.dart';
 import 'package:budget/database/generatePreviewData.dart';
 import 'package:budget/database/tables.dart';
 import 'package:budget/functions.dart';
@@ -323,6 +324,7 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             ),
                           )
                         : SizedBox(height: 5),
+                    const SpendingPlanEntry(),
                     // Not full screen
                     if (enableDoubleColumn(context) != true) ...[
                       HomePageOneMoneyDial(),

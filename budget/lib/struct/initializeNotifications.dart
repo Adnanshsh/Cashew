@@ -1,3 +1,4 @@
+import 'package:budget/struct/expense_tools/expense_tools.dart';
 import 'package:budget/database/tables.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/pages/addTransactionPage.dart';
@@ -39,12 +40,22 @@ Future<String?> initializeNotifications() async {
       await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
   NotificationResponse? payload =
       notificationAppLaunchDetails?.notificationResponse;
-  String? response = await payload?.payload;
+  String? response = notificationResponsePayload(payload);
   return response;
 }
 
+String? notificationResponsePayload(NotificationResponse? response) {
+  if (response?.payload == 'expenseReminder') {
+    return response?.actionId == 'quickExpense'
+        ? 'quickExpense'
+        : 'floatingButton';
+  }
+  return response?.payload;
+}
+
+@pragma('vm:entry-point')
 onSelectNotification(NotificationResponse notificationResponse) async {
-  String? payloadData = notificationResponse.payload;
+  String? payloadData = notificationResponsePayload(notificationResponse);
   notificationPayload = payloadData;
   runNotificationPayLoadsNoContext();
 }
@@ -66,7 +77,19 @@ Future<bool> runNotificationPayLoads(context) async {
   print("Notification payload: " + notificationPayload.toString());
   if (kIsWeb) return false;
   if (notificationPayload == null) return false;
-  if (notificationPayload == "addTransaction") {
+  final payload = notificationPayload;
+  notificationPayload = null;
+  if (payload == 'quickExpense' || payload == 'floatingButton') {
+    if (payload == 'floatingButton' &&
+        ExpenseTools.supported &&
+        await ExpenseTools.showBubble(requestPermission: false)) {
+      await ExpenseTools.channel.invokeMethod('backgroundApp');
+    } else {
+      await ExpenseTools.quickEntry(context);
+    }
+    return true;
+  }
+  if (payload == "addTransaction") {
     // Add a delay so the keyboard can focus
     await Future.delayed(Duration(milliseconds: 50), () async {
       pushRoute(
@@ -77,15 +100,15 @@ Future<bool> runNotificationPayLoads(context) async {
       );
     });
     return true;
-  } else if (notificationPayload == "upcomingTransaction") {
+  } else if (payload == "upcomingTransaction") {
     // When the notification comes in, the transaction is past due!
     pushRoute(
       context,
       UpcomingOverdueTransactions(overdueTransactions: null),
     );
     return true;
-  } else if (notificationPayload?.split("?")[0] == "openTransaction") {
-    Uri notificationPayloadUri = Uri.parse(notificationPayload ?? "");
+  } else if (payload?.split("?")[0] == "openTransaction") {
+    Uri notificationPayloadUri = Uri.parse(payload ?? "");
     if (notificationPayloadUri.queryParameters["transactionPk"] == null)
       return false;
     String transactionPk =

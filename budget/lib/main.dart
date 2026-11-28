@@ -1,3 +1,4 @@
+import 'package:budget/struct/expense_tools/expense_tools.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/pages/accountsPage.dart';
 import 'package:budget/pages/autoTransactionsPageEmail.dart';
@@ -7,6 +8,7 @@ import 'package:budget/struct/keyboardIntents.dart';
 import 'package:budget/struct/logging.dart';
 import 'package:budget/widgets/fadeIn.dart';
 import 'package:budget/struct/languageMap.dart';
+import 'package:budget/struct/westernDigits.dart';
 import 'package:budget/struct/initializeBiometrics.dart';
 import 'package:budget/widgets/util/appLinks.dart';
 import 'package:budget/widgets/util/onAppResume.dart';
@@ -44,6 +46,8 @@ bool allowDangerousDebugFlags = kDebugMode;
 void main() async {
   captureLogs(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    // Set the numeric policy before Material/Intl cache any locale formatters.
+    await initializeWesternDigits();
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -55,6 +59,7 @@ void main() async {
     await loadCurrencyJSON();
     await loadLanguageNamesJSON();
     await initializeSettings();
+    await ExpenseTools.initialize();
     tz.initializeTimeZones();
     final String? locationName = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(locationName ?? "America/New_York"));
@@ -150,6 +155,7 @@ class App extends StatelessWidget {
           updateGlobalAppLifecycleState: true,
           onAppResume: () async {
             await setHighRefreshRate();
+            await ExpenseTools.onResume();
           },
           child: InitializeBiometrics(
             child: InitializeNotificationService(

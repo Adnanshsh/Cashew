@@ -294,7 +294,7 @@ class _SelectAmountState extends State<SelectAmount> {
   void addToAmount(String input, {bool hapticFeedback = true}) {
     if (appStateSettings["numberPadHapticFeedback"] == true && hapticFeedback) {
       if (includesOperations(input, false))
-        HapticFeedback.mediumImpact();
+        HapticFeedback.selectionClick();
       else
         HapticFeedback.selectionClick();
     }
@@ -356,7 +356,7 @@ class _SelectAmountState extends State<SelectAmount> {
 
   void removeToAmount() {
     if (appStateSettings["numberPadHapticFeedback"] == true) {
-      HapticFeedback.mediumImpact();
+      HapticFeedback.selectionClick();
     }
     // bottomSheetControllerGlobal.snapToExtent(0);
     setState(() {
@@ -1452,7 +1452,7 @@ class _SelectAmountValueState extends State<SelectAmountValue> {
 
   void removeToAmount() {
     if (appStateSettings["numberPadHapticFeedback"] == true) {
-      HapticFeedback.mediumImpact();
+      HapticFeedback.selectionClick();
     }
     setState(() {
       if (amount.length > 0) {

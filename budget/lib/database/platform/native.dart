@@ -15,10 +15,9 @@ Future<FinanceDatabase> constructDb(String dbName,
     // for your app.
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, dbName + '.sqlite'));
-    // return NativeDatabase(file);
-    QueryExecutor foregroundExecutor = NativeDatabase(file);
-    QueryExecutor backgroundExecutor = NativeDatabase.createInBackground(file);
-    return MultiExecutor(read: foregroundExecutor, write: backgroundExecutor);
+    // SQLite executes queries synchronously. Keep reads as well as writes off
+    // the UI isolate so database queries don't block page transition animations.
+    return NativeDatabase.createInBackground(file);
   });
   return FinanceDatabase(db);
 }
@@ -43,3 +42,4 @@ Future overwriteDefaultDB(Uint8List dataStore) async {
   // we need to be able to sync with others after the restore
   await sharedPreferences.setString("dateOfLastSyncedWithClient", "{}");
 }
+

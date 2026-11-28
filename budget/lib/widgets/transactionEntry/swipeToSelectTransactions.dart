@@ -28,6 +28,10 @@ class _SwipeToSelectTransactionsState extends State<SwipeToSelectTransactions> {
   Widget build(BuildContext context) {
     return Listener(
       onPointerMove: (PointerEvent event) {
+        // Ordinary scrolling needs no second hit test through the page subtree.
+        // This wrapper also surrounds pages without any transaction entries.
+        if (selectingTransactionsActive == 0) return;
+
         // reference: https://stackoverflow.com/questions/70277515/how-can-i-select-widgets-by-dragging-over-them-but-also-clicking-them-individual
         final RenderBox box =
             key.currentContext!.findAncestorRenderObjectOfType<RenderBox>()!;
@@ -37,23 +41,24 @@ class _SwipeToSelectTransactionsState extends State<SwipeToSelectTransactions> {
           for (final hit in result.path) {
             final target = hit.target;
             if (target is TransactionEntryHitBox) {
-              if (selectingTransactionsActive == 0) {
-                return;
-              }
               if (target.transactionKey != null) {
                 if (selectingTransactionsActive == 1) {
-                  if (!globalSelectedID.value[widget.listID]!
-                      .contains(target.transactionKey!)) {
-                    globalSelectedID.value[widget.listID]!
-                        .add(target.transactionKey!);
+                  if (!globalSelectedID.value[widget.listID]!.contains(
+                    target.transactionKey!,
+                  )) {
+                    globalSelectedID.value[widget.listID]!.add(
+                      target.transactionKey!,
+                    );
                     globalSelectedID.notifyListeners();
                     HapticFeedback.selectionClick();
                   }
                 } else if (selectingTransactionsActive == -1) {
-                  if (globalSelectedID.value[widget.listID]!
-                      .contains(target.transactionKey!)) {
-                    globalSelectedID.value[widget.listID]!
-                        .remove(target.transactionKey);
+                  if (globalSelectedID.value[widget.listID]!.contains(
+                    target.transactionKey!,
+                  )) {
+                    globalSelectedID.value[widget.listID]!.remove(
+                      target.transactionKey,
+                    );
                     globalSelectedID.notifyListeners();
                     HapticFeedback.selectionClick();
                   }
@@ -66,10 +71,10 @@ class _SwipeToSelectTransactionsState extends State<SwipeToSelectTransactions> {
       onPointerUp: (_) {
         selectingTransactionsActive = 0;
       },
-      child: SizedBox(
-        key: key,
-        child: widget.child,
-      ),
+      onPointerCancel: (_) {
+        selectingTransactionsActive = 0;
+      },
+      child: SizedBox(key: key, child: widget.child),
     );
   }
 }

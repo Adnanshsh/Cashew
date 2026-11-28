@@ -76,6 +76,10 @@ Future<bool> initializeSettings() async {
   }
 
   appStateSettings = userSettings;
+  if (appStateSettings['expenseToolsMigrated'] != true) {
+    appStateSettings['numberPadHapticFeedback'] = true;
+    appStateSettings['expenseToolsMigrated'] = true;
+  }
   print(
       "App settings loaded: if logging is enabled, logs will now be captured");
 
