@@ -39,8 +39,8 @@ void main() {
           OneMoneyCategoryBadge(category: category).build(context) as Container;
       final decoration = badge.decoration! as BoxDecoration;
       expect(decoration.shape, BoxShape.circle);
-      expect(decoration.color, tone.withOpacity(0.14));
-      expect((badge.child! as Image).color, tone);
+      expect(decoration.color?.value, tone.withOpacity(0.14).value);
+      expect((badge.child! as Image).color?.value, tone.value);
       return const SizedBox.shrink();
     }));
   });
