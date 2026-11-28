@@ -75,6 +75,30 @@ void main() {
         500.25);
     expect(parseBankSms('18787', 'تم إضافة مستفيد بحساب 123456'), isNull);
   });
+  test('pasted bank messages work without a verified sender', () {
+    final debit = parsePastedBankSms(
+        'تم خصم مبلغ ٤٢٫٥٠٠ د.ل من بطاقتك 1234، الرصيد 300.000 د.ل');
+    expect(debit?.amount, 42.5);
+    expect(debit?.income, false);
+    final deposit = parsePastedBankSms('Credited LYD 100.250 to account 555');
+    expect(deposit?.amount, 100.25);
+    expect(deposit?.income, true);
+  });
+  test(
+      'pasted messages do not infer currency, guess foreign amounts or parse OTPs',
+      () {
+    for (final text in [
+      'تم خصم مبلغ 50 من الحساب',
+      'تم خصم مبلغ 50 دينار تونسي',
+      'Purchase of USD 10 converted to 45 LYD',
+      'Purchase 20 LYD; OTP 123456',
+      'الرصيد 200 دينار ليبي',
+      'Purchase 2.1234 LYD',
+      'تم خصم 10 دينار وتم إضافة 20 دينار',
+    ]) {
+      expect(parsePastedBankSms(text), isNull, reason: text);
+    }
+  });
   test('four reminder slots normalize, persist and reject invalid settings',
       () {
     expect(expenseReminderMinutes(null), [600, 840, 1080, 1320]);

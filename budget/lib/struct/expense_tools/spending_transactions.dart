@@ -8,7 +8,7 @@ Stream<List<Transaction>> watchSpendingCycle(
         ..where((t) =>
             t.walletFk.equals(wallet) &
             t.categoryFk.equals('0').not() &
-            t.skipPaid.equals(false) &
+            (t.type.isNull() | t.skipPaid.equals(false)) &
             t.dateCreated.isBiggerOrEqualValue(cycle.start) &
             t.dateCreated.isSmallerThanValue(cycle.next)))
       .watch();

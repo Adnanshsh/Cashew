@@ -28,7 +28,7 @@ class ParsedBankSms {
   final String sender;
   final double amount;
   final bool income;
-  String get bank => bankSmsSenders[sender]!;
+  String get bank => bankSmsSenders[sender] ?? '';
 }
 
 /// Conservative extraction: never interpret a balance, OTP, card or account
@@ -36,6 +36,18 @@ class ParsedBankSms {
 ParsedBankSms? parseBankSms(String sender, String body) {
   sender = normalizeBankSender(sender);
   if (!bankSmsSenders.containsKey(sender)) return null;
+  return _parseTransactionText(sender, body, requireCurrency: false);
+}
+
+/// A user-pasted message has no verified sender. Require explicit LYD and
+/// never treat this path as an automatically ingested bank message.
+ParsedBankSms? parsePastedBankSms(String body) {
+  if (body.trim().isEmpty || body.length > 4000) return null;
+  return _parseTransactionText('', body, requireCurrency: true);
+}
+
+ParsedBankSms? _parseTransactionText(String sender, String body,
+    {required bool requireCurrency}) {
   var text = normalizeBankText(body).toLowerCase();
   if (RegExp(
           r'\botp\b|one.?time|verification|رمز التحقق|رمز التاكيد|كلمة المرور')
@@ -45,6 +57,13 @@ ParsedBankSms? parseBankSms(String sender, String body) {
       .split(RegExp(
           r'الرصيد|رصيدك|رصيد حسابك|available balance|current balance|balance|العمولة|الرسوم|fees?\b'))
       .first;
+  // A message showing an original foreign amount and an LYD equivalent
+  // needs manual review instead of guessing which amount is the actual debit.
+  if (requireCurrency &&
+      RegExp(r'\b(?:usd|eur|gbp|sar|aed|tnd|egp|try|qar|kwd|bhd|omr|jod|dzd|mad|cad|aud|chf|cny|jpy|rub)\b|[$€£¥]|دولار|يورو|ريال|درهم|جنيه|ليرة|تونسي')
+          .hasMatch(text)) {
+    return null;
+  }
   final debit = RegExp(
       r'تم\s+(?:خصم|سحب|دفع)|خصم|سحب|مدين|عملية شراء|تم الشراء|\bdebit(?:ed)?\b|\bwithdraw(?:al|n)?\b|\bpurchase\b|\bspent\b');
   final credit = RegExp(
@@ -55,14 +74,15 @@ ParsedBankSms? parseBankSms(String sender, String body) {
   final direction = (out ?? incoming)!;
   final tail = text.substring(direction.end);
   const number = r'([0-9]+(?:[,.][0-9]+)*)';
-  const currency = r'(?:د\s*\.?\s*ل\.?|دينار(?:ا)?|\b(?:lyd|l\.d\.?|ld)\b)';
+  const currency =
+      r'(?:د\s*\.?\s*ل\.?|دينار(?:ا)?(?:\s+ليبي)?|\b(?:lyd|l\.d\.?|ld)\b)';
   final candidates = <String>[];
   // Require a currency or an explicit amount label, not a bare number.
   final currencyAfter = RegExp('$number\\s*$currency', caseSensitive: false);
   final currencyBefore = RegExp('$currency\\s*$number', caseSensitive: false);
   candidates.addAll(currencyAfter.allMatches(tail).map((m) => m.group(1)!));
   candidates.addAll(currencyBefore.allMatches(tail).map((m) => m.group(1)!));
-  if (candidates.isEmpty) {
+  if (candidates.isEmpty && !requireCurrency) {
     final labelled = RegExp(
             '^(?:\\s|[:،,-])*(?:مبلغ|بقيمة|بمبلغ|amount(?: of)?)\\s*[:=]?\\s*$number',
             caseSensitive: false)
@@ -74,6 +94,10 @@ ParsedBankSms? parseBankSms(String sender, String body) {
   final values = parsed.cast<double>().toSet();
   if (values.length != 1) return null;
   final amount = values.single;
+  if (requireCurrency &&
+      (amount * 1000 - (amount * 1000).round()).abs() > 0.00001) {
+    return null;
+  }
   if (amount <= 0 || !amount.isFinite || amount >= 999999999999) return null;
   return ParsedBankSms(
       sender: sender, amount: amount, income: incoming != null);
