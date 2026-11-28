@@ -99,6 +99,22 @@ void main() {
       expect(parsePastedBankSms(text), isNull, reason: text);
     }
   });
+  test('instant category capture only parses a known, clear LYD debit', () {
+    final text = 'تم خصم مبلغ ٤٢٫٥٠٠ د.ل من بطاقتك، الرصيد 300 د.ل';
+    final debit = parseBankSmsQuickDebit('18888', text);
+    expect(debit?.amount, 42.5);
+    expect(debit?.sender, '18888');
+    expect(parseBankSmsQuickDebit('unknown', text), isNull);
+    for (final invalid in [
+      'Credited 12 LYD to your account',
+      'Purchase of USD 10 converted to 45 LYD',
+      'تم خصم مبلغ 50 من الحساب',
+      'Purchase 20 LYD; OTP 123456',
+      'تم خصم 20 دينار وتم إضافة 10 دينار',
+    ]) {
+      expect(parseBankSmsQuickDebit('18888', invalid), isNull, reason: invalid);
+    }
+  });
   test('four reminder slots normalize, persist and reject invalid settings',
       () {
     expect(expenseReminderMinutes(null), [600, 840, 1080, 1320]);

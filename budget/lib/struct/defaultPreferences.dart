@@ -148,6 +148,7 @@ Future<Map<String, dynamic>> getDefaultPreferences() async {
     "notifications": true,
     "expenseReminderMinutes": [600, 840, 1080, 1320],
     "bankSmsEnabled": false,
+    "bankSmsQuickDebit": false,
     "bankSmsWallets": <String, dynamic>{},
     "expenseToolsMigrated": false,
     "notificationHour": 20,

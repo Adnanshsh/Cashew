@@ -6,6 +6,7 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Telephony
+import android.provider.Settings
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -48,17 +49,35 @@ class BankSmsReceiver : BroadcastReceiver() {
             .joinToString("") { "%02x".format(it) }
         val row = JSONObject().put("id", digest).put("sender", sender).put("body", body).put("timestamp", timestamp)
         if (!BankSmsStore.add(context, row)) return
+        val quick = BankSmsStore.preferences(context).getBoolean("quickDebit", false) &&
+            BankSmsCapture.isDebitCandidate(body)
+        val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val power = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        if (quick && power.isInteractive && !keyguard.isKeyguardLocked &&
+            Settings.canDrawOverlays(context)) {
+            try { context.startActivity(BankSmsCapture.intent(context, digest, true)) }
+            catch (_: RuntimeException) { /* Android may block it; use the notification. */ }
+        }
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = if (quick) "bankDebitCapture" else "bankSmsReview"
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
-            NotificationChannel("bankSmsReview", "مراجعة رسائل البنوك", NotificationManager.IMPORTANCE_DEFAULT))
-        val open = PendingIntent.getActivity(context, 703, Intent(context, MainActivity::class.java)
-            .putExtra("bankReview", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            NotificationChannel(channelId, if (quick) "اختيار قسم الخصم" else "مراجعة رسائل البنوك",
+                if (quick) NotificationManager.IMPORTANCE_HIGH else NotificationManager.IMPORTANCE_DEFAULT))
+        val openIntent = if (quick) BankSmsCapture.intent(context, digest, false).apply {
+            // Extras do not distinguish PendingIntents for different messages.
+            data = android.net.Uri.parse("cashew-bank-capture:$digest")
+        } else Intent(context, MainActivity::class.java)
+            .putExtra("bankReview", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val open = PendingIntent.getActivity(context, 703, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(context, "bankSmsReview") else Notification.Builder(context)
-        manager.notify(600000011, builder.setSmallIcon(R.drawable.notification_icon_android2)
-            .setContentTitle("وصلت رسالة مصرفية")
-            .setContentText("اضغط لمراجعتها وربطها بالحساب قبل التسجيل")
-            .setVisibility(Notification.VISIBILITY_PRIVATE).setContentIntent(open).setAutoCancel(true).build())
+        val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(context, channelId) else Notification.Builder(context)
+        if (quick) builder.setPriority(Notification.PRIORITY_HIGH)
+        manager.notify(if (quick) digest else "bank-review", 600000011,
+            builder.setSmallIcon(R.drawable.notification_icon_android2)
+                .setContentTitle("وصلت رسالة مصرفية")
+                .setContentText(if (quick) "اضغط لاختيار القسم" else "اضغط لمراجعتها قبل التسجيل")
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .setContentIntent(open).setAutoCancel(true).build())
     }
 }

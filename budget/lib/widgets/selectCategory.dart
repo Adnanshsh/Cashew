@@ -8,6 +8,7 @@ import 'package:budget/widgets/animatedExpanded.dart';
 import 'package:budget/widgets/button.dart';
 import 'package:budget/widgets/categoryIcon.dart';
 import 'package:budget/widgets/openBottomSheet.dart';
+import 'package:budget/widgets/one_money_category_badge.dart';
 import 'package:budget/widgets/openPopup.dart';
 import 'package:budget/widgets/tappable.dart';
 import 'package:budget/widgets/textWidgets.dart';
@@ -47,6 +48,7 @@ class SelectCategory extends StatefulWidget {
     this.forceSelectAllToFalse = false,
     this.listPadding = const EdgeInsetsDirectional.symmetric(horizontal: 20),
     this.selectedIncome,
+    this.dialStyle = false,
   }) : super(key: key);
   final Function(TransactionCategory)? setSelectedCategory;
   final Function(List<String>?)? setSelectedCategories;
@@ -72,6 +74,7 @@ class SelectCategory extends StatefulWidget {
   final bool forceSelectAllToFalse;
   final EdgeInsetsDirectional listPadding;
   final bool? selectedIncome;
+  final bool dialStyle;
 
   @override
   _SelectCategoryState createState() => _SelectCategoryState();
@@ -295,6 +298,41 @@ class _SelectCategoryState extends State<SelectCategory> {
                 widget.hideCategoryFks!.contains(category.categoryPk)) {
               continue;
             }
+            final selected = selectedCategories.contains(category.categoryPk);
+            void onCategoryTap() {
+              if (widget.nextWithCategory != null) {
+                widget.nextWithCategory!(category);
+              }
+              if (widget.setSelectedCategory != null) {
+                widget.setSelectedCategory!(category);
+                setState(() {
+                  selectedCategories = [];
+                  selectedCategories.add(category.categoryPk);
+                });
+                Future.delayed(Duration(milliseconds: 70), () {
+                  if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
+                    return;
+                  }
+                  if (widget.popRoute) popRoute(context, category);
+                  if (widget.next != null) {
+                    widget.next!();
+                  }
+                });
+              } else if (widget.setSelectedCategories != null) {
+                if (selectedCategories.contains(category.categoryPk)) {
+                  setState(() {
+                    selectedCategories.remove(category.categoryPk);
+                  });
+                  widget.setSelectedCategories!(selectedCategories);
+                } else {
+                  setState(() {
+                    selectedCategories.add(category.categoryPk);
+                  });
+                  widget.setSelectedCategories!(selectedCategories);
+                }
+              }
+            }
+
             categoryIcons.add(
               AnimatedScale(
                 key: ValueKey(category.categoryPk),
@@ -311,46 +349,47 @@ class _SelectCategoryState extends State<SelectCategory> {
                           selectedCategories.contains(category.categoryPk)
                       ? 0.3
                       : 1,
-                  child: CategoryIcon(
-                    enableTooltip: category.name.length > 10,
-                    canEditByLongPress: dragEnabled == false,
-                    categoryPk: category.categoryPk,
-                    size: size,
-                    sizePadding: 24,
-                    margin: EdgeInsetsDirectional.zero,
-                    label: widget.labelIcon,
-                    onTap: () {
-                      if (widget.nextWithCategory != null) {
-                        widget.nextWithCategory!(category);
-                      }
-                      if (widget.setSelectedCategory != null) {
-                        widget.setSelectedCategory!(category);
-                        setState(() {
-                          selectedCategories = [];
-                          selectedCategories.add(category.categoryPk);
-                        });
-                        Future.delayed(Duration(milliseconds: 70), () {
-                          if (widget.popRoute) popRoute(context, category);
-                          if (widget.next != null) {
-                            widget.next!();
-                          }
-                        });
-                      } else if (widget.setSelectedCategories != null) {
-                        if (selectedCategories.contains(category.categoryPk)) {
-                          setState(() {
-                            selectedCategories.remove(category.categoryPk);
-                          });
-                          widget.setSelectedCategories!(selectedCategories);
-                        } else {
-                          setState(() {
-                            selectedCategories.add(category.categoryPk);
-                          });
-                          widget.setSelectedCategories!(selectedCategories);
-                        }
-                      }
-                    },
-                    outline: selectedCategories.contains(category.categoryPk),
-                  ),
+                  child: widget.dialStyle
+                      ? InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: onCategoryTap,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: OneMoneyCategoryBadge(
+                                    category: category,
+                                    selected: selected,
+                                    size: 48,
+                                  ),
+                                ),
+                              ),
+                              if (widget.labelIcon) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  category.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.labelSmall,
+                                ),
+                              ],
+                            ],
+                          ),
+                        )
+                      : CategoryIcon(
+                          enableTooltip: category.name.length > 10,
+                          canEditByLongPress: !dragEnabled,
+                          categoryPk: category.categoryPk,
+                          size: size,
+                          sizePadding: 24,
+                          margin: EdgeInsetsDirectional.zero,
+                          label: widget.labelIcon,
+                          onTap: onCategoryTap,
+                          outline: selected,
+                        ),
                 ),
               ),
             );

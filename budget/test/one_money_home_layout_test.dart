@@ -1,4 +1,6 @@
+import 'package:budget/database/tables.dart';
 import 'package:budget/pages/expense_tools/spending_plan.dart';
+import 'package:budget/widgets/one_money_category_badge.dart';
 import 'package:budget/pages/homePage/homePageOneMoneyDial.dart';
 import 'package:budget/pages/oneMoneyPage.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +20,27 @@ void main() {
         isA<SpendingPlanEntry>(),
         isA<HomePageOneMoneyDial>(),
       ]);
+      return const SizedBox.shrink();
+    }));
+  });
+  testWidgets('category badge uses the dial’s circular tinted icon',
+      (tester) async {
+    final category = TransactionCategory(
+        categoryPk: 'food',
+        name: 'Food',
+        colour: '#336699',
+        iconName: 'cash-bill-dollar.png',
+        dateCreated: DateTime(2026, 11, 28),
+        order: 1,
+        income: false);
+    await tester.pumpWidget(Builder(builder: (context) {
+      const tone = Color(0xff336699);
+      final badge =
+          OneMoneyCategoryBadge(category: category).build(context) as Container;
+      final decoration = badge.decoration! as BoxDecoration;
+      expect(decoration.shape, BoxShape.circle);
+      expect(decoration.color, tone.withOpacity(0.14));
+      expect((badge.child! as Image).color, tone);
       return const SizedBox.shrink();
     }));
   });

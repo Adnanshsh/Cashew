@@ -5,6 +5,14 @@ const bankSmsSenders = <String, String>{
   'NCB': 'التجاري',
 };
 
+/// Automatic category capture accepts only known senders and clear LYD debits.
+ParsedBankSms? parseBankSmsQuickDebit(String sender, String body) {
+  sender = normalizeBankSender(sender);
+  if (!bankSmsSenders.containsKey(sender) || body.length > 4000) return null;
+  final parsed = _parseTransactionText(sender, body, requireCurrency: true);
+  return parsed?.income == false ? parsed : null;
+}
+
 String normalizeBankSender(String sender) => sender.trim().toUpperCase();
 
 String normalizeBankText(String input) {

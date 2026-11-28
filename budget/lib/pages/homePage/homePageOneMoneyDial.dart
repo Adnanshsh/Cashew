@@ -8,6 +8,7 @@ import 'package:budget/pages/addCategoryPage.dart';
 import 'package:budget/pages/addBudgetPage.dart';
 import 'package:budget/pages/transactionsSearchPage.dart';
 import 'package:budget/widgets/openPopup.dart';
+import 'package:budget/widgets/one_money_category_badge.dart';
 
 class HomePageOneMoneyDial extends StatefulWidget {
   const HomePageOneMoneyDial({Key? key}) : super(key: key);
@@ -921,20 +922,7 @@ class _HomePageOneMoneyDialState extends State<HomePageOneMoneyDial> {
               style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 6),
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: spent > 0 ? catColor : catColor.withOpacity(0.14),
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Image.asset(
-                "assets/categories/${cat.iconName ?? 'cash-bill-dollar.png'}",
-                color: spent > 0 ? Colors.white : catColor,
-                fit: BoxFit.contain,
-              ),
-            ),
+            OneMoneyCategoryBadge(category: cat, selected: spent > 0),
             const SizedBox(height: 6),
             Text(
               "${_formatAmount(spent)} ل.د",
