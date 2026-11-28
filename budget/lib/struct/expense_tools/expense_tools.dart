@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:drift/drift.dart' hide Column;
 import 'package:budget/database/tables.dart';
 import 'package:budget/struct/databaseGlobal.dart';
 import 'package:budget/struct/expense_tools/bank_sms_parser.dart';
@@ -24,17 +25,47 @@ class ExpenseTools {
   static bool _opening = false;
   static bool _quickPending = false;
   static bool _bankPending = false;
+  static final _bankCaptures = <String, String>{};
+  static String? _activeCapture;
+  static bool get quickDebitEnabled =>
+      appStateSettings['bankSmsQuickDebit'] == true;
+
+  static Future<void> configureBankSms() async {
+    if (!supported) return;
+    await channel.invokeMethod('configureSms', {
+      'enabled': appStateSettings['bankSmsEnabled'] == true,
+      'quickDebit': quickDebitEnabled,
+    });
+  }
+
+  static Future<void> _consumeLaunch() async {
+    final launch =
+        await channel.invokeMapMethod<String, dynamic>('consumeLaunch');
+    _quickPending = _quickPending || launch?['quick'] == true;
+    _bankPending = _bankPending || launch?['bank'] == true;
+    final captures = launch?['captures'];
+    if (captures is Map) {
+      for (final entry in captures.entries) {
+        final id = entry.key;
+        final mode = entry.value;
+        if (id is String && mode is String && id != _activeCapture) {
+          _bankCaptures[id] = mode;
+        }
+      }
+    }
+  }
+
   static final inboxRevision = ValueNotifier<int>(0);
 
   static Future<void> initialize() async {
     if (!supported) return;
     channel.setMethodCallHandler((call) async {
-      if (call.method == 'quickEntry') _quickPending = true;
-      if (call.method == 'bankReview') _bankPending = true;
-      await _openPending();
+      if (_ready) {
+        await _consumeLaunch();
+        await _openPending();
+      }
     });
-    await channel.invokeMethod('configureSms',
-        {'enabled': appStateSettings['bankSmsEnabled'] == true});
+    await configureBankSms();
   }
 
   static Future<void> onReady() async {
@@ -45,32 +76,140 @@ class ExpenseTools {
 
   static Future<void> onResume() async {
     if (!supported || !_ready) return;
-    final launch =
-        await channel.invokeMapMethod<String, dynamic>('consumeLaunch');
-    _quickPending = _quickPending || launch?['quick'] == true;
-    _bankPending = _bankPending || launch?['bank'] == true;
+    await _consumeLaunch();
+    final opened = _openPending();
     await recordMatchingSms();
     inboxRevision.value++;
-    await _openPending();
+    await opened;
   }
 
   static Future<void> _openPending() async {
     final context = navigatorKey.currentContext;
     if (!_ready || _opening || context == null) return;
-    if (_quickPending) {
+    if (_bankCaptures.isNotEmpty) {
+      final id = _bankCaptures.keys.first;
+      final mode = _bankCaptures.remove(id)!;
+      _opening = true;
+      _activeCapture = id;
+      try {
+        await _openBankCapture(context, id, mode);
+      } finally {
+        // A notification tap may reopen a previously dismissed picker.
+        _activeCapture = null;
+        _opening = false;
+      }
+    } else if (_quickPending) {
       _quickPending = false;
-      // Consume native launch extras too, preventing another open on resume.
-      await channel.invokeMethod('consumeLaunch');
       await quickEntry(context);
     } else if (_bankPending) {
       _bankPending = false;
-      await channel.invokeMethod('consumeLaunch');
       _opening = true;
       try {
         await pushRoute(context, const BankSmsPage());
       } finally {
         _opening = false;
       }
+    } else {
+      return;
+    }
+    await _openPending();
+  }
+
+  static Future<void> _openBankCapture(
+      BuildContext context, String id, String mode) async {
+    if (!quickDebitEnabled) return;
+    final matches = (await pendingSms()).where((row) => row.id == id);
+    if (matches.isEmpty || !context.mounted) return;
+    final message = matches.first;
+    final existing = await (database.select(database.transactions)
+          ..where((t) => t.transactionPk.equals(message.transactionPk)))
+        .getSingleOrNull();
+    if (existing != null) {
+      await dismissSms(id);
+      return;
+    }
+    final parsed = parseBankSmsQuickDebit(message.sender, message.body);
+    if (!context.mounted) return;
+    if (parsed == null) {
+      if (mode == 'manual') await pushRoute(context, const BankSmsPage());
+      return;
+    }
+
+    final wallets = (await database.getAllWallets())
+        .where((wallet) => wallet.currency?.toUpperCase() == 'LYD')
+        .toList();
+    if (!context.mounted) return;
+    final walletKey =
+        (appStateSettings['bankSmsWallets'] as Map?)?[message.sender];
+    final linked = wallets.where((wallet) => wallet.walletPk == walletKey);
+    var floating = false;
+    try {
+      if (mode == 'floating') {
+        await channel.invokeMethod('quickWindow', {'enabled': true});
+        floating = true;
+      }
+      if (!context.mounted) return;
+      final wallet = linked.isNotEmpty
+          ? linked.first
+          : await showDialog<TransactionWallet>(
+              context: context,
+              useRootNavigator: false,
+              builder: (dialogContext) => SimpleDialog(
+                title: Text(expenseText(
+                    context, 'اختر حساب الخصم', 'Choose the account charged')),
+                children: [
+                  if (wallets.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(expenseText(
+                          context,
+                          'لا يوجد حساب بالدينار الليبي.',
+                          'No Libyan dinar account is available.')),
+                    ),
+                  for (final account in wallets)
+                    SimpleDialogOption(
+                      onPressed: () => Navigator.pop(dialogContext, account),
+                      child: Text(account.name),
+                    ),
+                  SimpleDialogOption(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: Text(expenseText(context, 'لاحقًا', 'Later')),
+                  ),
+                ],
+              ),
+            );
+      if (wallet == null || !context.mounted) return;
+      final selection = await selectCategorySequence(
+        context,
+        selectedCategory: null,
+        setSelectedCategory: (_) {},
+        selectedSubCategory: null,
+        setSelectedSubCategory: (_) {},
+        selectedIncomeInitial: false,
+        allowDirectionOverride: false,
+        subtitle: '${parsed.amount.toStringAsFixed(3)} · ${wallet.name}',
+        allowReorder: false,
+      );
+      if (selection.main == null || selection.main!.income || !context.mounted)
+        return;
+      await pushRoute(
+        context,
+        AddTransactionPage(
+          transactionPkOverride: message.transactionPk,
+          selectedWallet: wallet,
+          selectedAmount: parsed.amount,
+          selectedIncome: false,
+          selectedCategory: selection.main,
+          selectedSubCategory: selection.sub,
+          selectedDate: message.date,
+          selectedTitle: bankSmsSenders[message.sender],
+          startInitialAddTransactionSequence: false,
+          onTransactionSaved: (_) => dismissSms(id),
+          routesToPopAfterDelete: RoutesToPopAfterDelete.None,
+        ),
+      );
+    } finally {
+      if (floating) await channel.invokeMethod('finishQuickWindow');
     }
   }
 
@@ -119,6 +258,7 @@ class ExpenseTools {
     for (final message in await pendingSms()) {
       if (message.date.millisecondsSinceEpoch < enabledSince) continue;
       final parsed = parseBankSms(message.sender, message.body);
+      if (quickDebitEnabled && parsed?.income == false) continue;
       final walletKey = mappings[message.sender];
       if (parsed == null || walletKey is! String) continue;
       final matches = rules

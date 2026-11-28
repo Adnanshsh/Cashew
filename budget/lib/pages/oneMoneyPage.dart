@@ -1,3 +1,4 @@
+import 'package:budget/pages/expense_tools/spending_plan.dart';
 import 'package:flutter/material.dart';
 import 'package:budget/pages/homePage/homePageOneMoneyDial.dart';
 
@@ -9,7 +10,14 @@ class OneMoneyQuickEntryPage extends StatelessWidget {
     return const Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          child: HomePageOneMoneyDial(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SpendingPlanEntry(),
+              HomePageOneMoneyDial(),
+            ],
+          ),
         ),
       ),
     );

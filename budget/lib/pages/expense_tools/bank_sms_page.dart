@@ -9,6 +9,8 @@ import 'package:budget/struct/expense_tools/bank_sms_parser.dart';
 import 'package:budget/struct/expense_tools/expense_tools.dart';
 import 'package:budget/struct/settings.dart';
 import 'package:budget/widgets/navigationFramework.dart';
+import 'package:budget/widgets/notificationsSettings.dart'
+    show checkNotificationsPermissionAndroid;
 import 'package:budget/widgets/openPopup.dart';
 import 'package:budget/widgets/util/onAppResume.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +27,7 @@ class _BankSmsPageState extends State<BankSmsPage> {
   bool _loading = true;
   bool _busy = false;
   bool _permission = false;
+  bool _overlayPermission = false;
   String? _error;
 
   @override
@@ -38,6 +41,9 @@ class _BankSmsPageState extends State<BankSmsPage> {
       final wallets = await database.getAllWallets();
       final permission =
           await ExpenseTools.channel.invokeMethod<bool>('smsPermission') ??
+              false;
+      final overlay =
+          await ExpenseTools.channel.invokeMethod<bool>('overlayPermission') ??
               false;
       await ExpenseTools.recordMatchingSms();
       final messages = await ExpenseTools.pendingSms();
@@ -57,6 +63,7 @@ class _BankSmsPageState extends State<BankSmsPage> {
           _wallets = wallets;
           _messages = pending;
           _permission = permission;
+          _overlayPermission = overlay;
           _loading = false;
           _error = null;
         });
@@ -175,11 +182,43 @@ class _BankSmsPageState extends State<BankSmsPage> {
                         }
                         await updateSettings('bankSmsEnabled', enabled,
                             updateGlobalState: false);
-                        await ExpenseTools.channel
-                            .invokeMethod('configureSms', {'enabled': enabled});
+                        await ExpenseTools.configureBankSms();
                         if (mounted) setState(() => _permission = enabled);
                       },
                     ),
+                    SwitchListTile(
+                      title: Text(expenseText(context, 'اختيار قسم الخصم فورًا',
+                          'Choose a category when debited')),
+                      subtitle: Text(expenseText(
+                          context,
+                          'للخصومات الواضحة فقط. لو الهاتف مقفول أو ما سمحش بعرض النافذة، افتحها من الإشعار.',
+                          'For clear debits only. If the window is blocked or the phone is locked, open the prompt from the notification.')),
+                      value: ExpenseTools.quickDebitEnabled,
+                      onChanged: !_permission
+                          ? null
+                          : (enabled) async {
+                              await updateSettings('bankSmsQuickDebit', enabled,
+                                  updateGlobalState: false);
+                              await ExpenseTools.configureBankSms();
+                              if (!mounted) return;
+                              setState(() {});
+                              if (!enabled) return;
+                              await checkNotificationsPermissionAndroid();
+                              if (mounted && !_overlayPermission) {
+                                await ExpenseTools.channel
+                                    .invokeMethod('requestOverlayPermission');
+                              }
+                            },
+                    ),
+                    if (ExpenseTools.quickDebitEnabled && !_overlayPermission)
+                      ListTile(
+                        title: Text(expenseText(
+                            context,
+                            'السماح بالظهور فوق التطبيقات',
+                            'Allow display over other apps')),
+                        onTap: () => ExpenseTools.channel
+                            .invokeMethod('requestOverlayPermission'),
+                      ),
                     SwitchListTile(
                         title: Text(expenseText(
                             context,
@@ -187,8 +226,8 @@ class _BankSmsPageState extends State<BankSmsPage> {
                             'Automatically record matching messages')),
                         subtitle: Text(expenseText(
                             context,
-                            'عند فتح التطبيق تُسجّل الرسائل الجديدة المطابقة لقالب واحد وفئة وحساب بالدينار الليبي. تبقى البقية للمراجعة.',
-                            'On opening the app, new messages matching one template, category and linked LYD account are recorded. Other messages stay in review.')),
+                            'عند فتح التطبيق تُسجّل الرسائل المطابقة لقالب واحد. عند تفعيل الاختيار الفوري، لا تُسجّل الخصومات تلقائيًا.',
+                            'On opening the app, messages matching one template are recorded. Debits are not auto-recorded when instant category selection is enabled.')),
                         value: appStateSettings['bankSmsAutoSince'] is int,
                         onChanged: (v) async {
                           await updateSettings('bankSmsAutoSince',

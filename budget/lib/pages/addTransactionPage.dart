@@ -3880,6 +3880,7 @@ Future<MainAndSubcategory> selectCategorySequence(
       selectedIncomeInitial, // if this is null, always show all categories
   String? subtitle,
   bool allowReorder = true,
+  bool allowDirectionOverride = true,
 }) async {
   MainAndSubcategory mainAndSubcategory = MainAndSubcategory();
   dynamic result = await openBottomSheet(
@@ -3896,6 +3897,7 @@ Future<MainAndSubcategory> selectCategorySequence(
       setSelectedIncome: setSelectedIncome,
       selectedIncomeInitial: selectedIncomeInitial,
       allowReorder: allowReorder,
+      allowDirectionOverride: allowDirectionOverride,
     ),
   );
   if (result != null && result is TransactionCategory) {
@@ -3913,6 +3915,7 @@ Future<MainAndSubcategory> selectCategorySequence(
             setSelectedCategory: setSelectedSubCategory,
             mainCategoryPks: [mainAndSubcategory.main!.categoryPk],
             allowRearrange: false,
+            dialStyle: true,
             header: [
               LayoutBuilder(builder: (context, constraints) {
                 return Column(
@@ -3986,6 +3989,7 @@ class SelectCategoryWithIncomeExpenseSelector extends StatefulWidget {
     required this.setSelectedIncome,
     required this.selectedIncomeInitial,
     this.allowReorder = true,
+    this.allowDirectionOverride = true,
     this.subtitle,
     super.key,
   });
@@ -4000,6 +4004,7 @@ class SelectCategoryWithIncomeExpenseSelector extends StatefulWidget {
   final Function(bool?)? setSelectedIncome;
   final bool? selectedIncomeInitial;
   final bool allowReorder;
+  final bool allowDirectionOverride;
   final String? subtitle;
 
   @override
@@ -4009,10 +4014,10 @@ class SelectCategoryWithIncomeExpenseSelector extends StatefulWidget {
 
 class _SelectCategoryWithIncomeExpenseSelectorState
     extends State<SelectCategoryWithIncomeExpenseSelector> {
-  late bool? selectedIncome =
-      appStateSettings["showAllCategoriesWhenSelecting"] == true
-          ? null
-          : widget.selectedIncomeInitial;
+  late bool? selectedIncome = widget.allowDirectionOverride &&
+          appStateSettings["showAllCategoriesWhenSelecting"] == true
+      ? null
+      : widget.selectedIncomeInitial;
 
   void setSelectedIncome(bool? value) {
     if (widget.setSelectedIncome != null) widget.setSelectedIncome!(value);
@@ -4031,7 +4036,8 @@ class _SelectCategoryWithIncomeExpenseSelectorState
       title: widget.setSelectedIncome == null ? "select-category".tr() : null,
       subtitle: widget.subtitle,
       hasPadding: false,
-      outsideExtraWidget: widget.setSelectedIncome != null
+      outsideExtraWidget: !widget.allowDirectionOverride ||
+              widget.setSelectedIncome != null
           // Hide option to rearrange because income/expense selector is shown
           ? null
           : CustomPopupMenuButton(
@@ -4091,6 +4097,7 @@ class _SelectCategoryWithIncomeExpenseSelectorState
               setSelectedCategory: widget.setSelectedCategory,
               selectedIncome: selectedIncome,
               allowRearrange: false,
+              dialStyle: true,
               // selectedIncome == null && widget.selectedIncomeInitial == null,
             ),
           ),
