@@ -9,6 +9,7 @@ import 'package:budget/pages/objectivesListPage.dart';
 import 'package:budget/pages/upcomingOverdueTransactionsPage.dart';
 import 'package:budget/pages/creditDebtTransactionsPage.dart';
 import 'package:budget/pages/expense_tools/bank_sms_page.dart';
+import 'package:budget/pages/expense_tools/bank_sms_paste_page.dart';
 import 'package:budget/struct/databaseGlobal.dart';
 import 'package:budget/struct/expense_tools/expense_tools.dart';
 import 'package:budget/struct/expense_tools/spending_cycle.dart';
@@ -40,11 +41,11 @@ class _SpendingPlanState extends State<SpendingPlanPage> {
   late double salary, savings, cap;
   late SpendingCycle cycle;
   late Stream<PlanTotals> rows;
-  late final walletName = database.getAllWallets().then((list) => list
-      .where((w) => w.walletPk == wallet)
-      .map((w) => [w.name, if (w.currency != null) w.currency!.toUpperCase()]
-          .join(' · '))
-      .join());
+  late final walletInfo = database.getWalletInstanceOrNull(wallet);
+  late final walletName = walletInfo.then((w) => w == null
+      ? ''
+      : [w.name, if (w.currency != null) w.currency!.toUpperCase()]
+          .join(' · '));
   String t(String ar, String en) => expenseText(context, ar, en);
   @override
   void initState() {
@@ -209,7 +210,7 @@ class _SpendingPlanState extends State<SpendingPlanPage> {
     double received = 0, before = 0, today = 0, reserved = savings;
     final seen = <String>{}, duplicates = <String>{};
     for (final tx in transactions) {
-      if (tx.skipPaid ||
+      if ((tx.type != null && tx.skipPaid) ||
           ignored.contains(tx.categoryFk) ||
           tx.pairedTransactionFk != null ||
           tx.objectiveLoanFk != null ||
@@ -271,6 +272,8 @@ class _SpendingPlanState extends State<SpendingPlanPage> {
           FutureBuilder<String>(
               future: walletName, builder: (_, s) => Text(s.data ?? '')),
           summary(),
+          link(t('الصق رسالة البنك', 'Paste a bank message'),
+              const BankSmsPastePage()),
           if (ExpenseTools.supported)
             link(t('قواعد تصنيف إشعارات المصرف', 'Bank notification rules'),
                 const AutoTransactionsPageNotifications()),
@@ -297,20 +300,67 @@ class _SpendingPlanState extends State<SpendingPlanPage> {
         final (today, reserved, before, available, projection, duplicates) =
             snapshot.data!;
         final dailyBase = available + today;
-        if (widget.compact)
-          return ListTile(
-              leading: const Icon(Icons.today_outlined),
-              title: Text(
-                  t('المتاح اليوم حتى الراتب', 'Available today until payday')),
-              subtitle: Text(available.toStringAsFixed(3)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () async {
-                await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const SpendingPlanPage()));
-                if (mounted) setState(loadSettings);
-              });
+        if (widget.compact) {
+          final theme = Theme.of(context);
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.today_outlined),
+                  title: Text(t('باقي لك اليوم', 'Left to spend today')),
+                  subtitle: FutureBuilder<TransactionWallet?>(
+                    future: walletInfo,
+                    builder: (_, walletSnapshot) {
+                      final currency =
+                          walletSnapshot.data?.currency?.toUpperCase();
+                      final label = currency == 'LYD'
+                          ? t('د.ل', 'LYD')
+                          : (currency ?? '');
+                      final formatted = available.toStringAsFixed(3);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('$formatted $label'.trim(),
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                  color: available < 0
+                                      ? theme.colorScheme.error
+                                      : null)),
+                          Text(t('باقي ${cycle.daysLeft} يوم للراتب',
+                              '${cycle.daysLeft} days to payday')),
+                        ],
+                      );
+                    },
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SpendingPlanPage()));
+                    if (mounted) setState(loadSettings);
+                  },
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Padding(
+                    padding:
+                        const EdgeInsetsDirectional.only(end: 12, bottom: 4),
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.content_paste),
+                      label:
+                          Text(t('الصق رسالة البنك', 'Paste a bank message')),
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const BankSmsPastePage())),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
         return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

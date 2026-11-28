@@ -1,3 +1,5 @@
+import 'package:budget/struct/expense_tools/bank_sms_parser.dart';
+import 'package:budget/struct/expense_tools/pasted_bank_transactions.dart';
 import 'dart:async';
 import 'package:budget/struct/expense_tools/spending_transactions.dart';
 import 'package:budget/struct/expense_tools/spending_cycle.dart';
@@ -93,9 +95,22 @@ void main() {
     final db = await openDatabase('salary-cycle');
     final cycle = SpendingCycle(DateTime(2026, 11, 12), 10);
     for (final row in [
-      ('purchase', cycle.start, true),
-      ('bill', DateTime(2026, 12, 9), false),
-      ('next', cycle.next, false)
+      ('purchase', cycle.start, true, true, null),
+      (
+        'bill',
+        DateTime(2026, 12, 9),
+        false,
+        false,
+        TransactionSpecialType.subscription
+      ),
+      (
+        'skipped',
+        DateTime(2026, 12, 8),
+        false,
+        true,
+        TransactionSpecialType.subscription
+      ),
+      ('next', cycle.next, false, false, TransactionSpecialType.subscription)
     ]) {
       await db.into(db.transactions).insert(Transaction(
           transactionPk: row.$1,
@@ -107,12 +122,42 @@ void main() {
           dateCreated: row.$2,
           income: false,
           paid: row.$3,
-          skipPaid: false));
+          skipPaid: row.$4,
+          type: row.$5));
     }
     final rows = await watchSpendingCycle(db, 'cash', cycle).first;
     expect(rows.map((t) => t.transactionPk),
         unorderedEquals(['purchase', 'bill']));
     expect(await watchSpendingCycle(db, 'other', cycle).first, isEmpty);
+  });
+
+  test('pasted-bank duplicate cue is scoped to date, wallet and direction',
+      () async {
+    final db = await openDatabase('bank-paste');
+    final day = DateTime(2026, 11, 27);
+    await db.into(db.transactions).insert(Transaction(
+        transactionPk: 'expense',
+        name: 'Review',
+        amount: -42.5,
+        note: '',
+        categoryFk: 'food',
+        walletFk: 'cash',
+        dateCreated: DateTime(2026, 11, 27, 23, 59),
+        income: false,
+        paid: true,
+        skipPaid: true));
+    final debit = parsePastedBankSms('Purchase 42.500 LYD')!;
+    final credit = parsePastedBankSms('Credited 42.500 LYD')!;
+    expect(
+        (await findSimilarBankTransaction(db, 'cash', day, debit))
+            ?.transactionPk,
+        'expense');
+    expect(await findSimilarBankTransaction(db, 'other', day, debit), isNull);
+    expect(await findSimilarBankTransaction(db, 'cash', day, credit), isNull);
+    expect(
+        await findSimilarBankTransaction(
+            db, 'cash', DateTime(2026, 11, 28), debit),
+        isNull);
   });
 
   test('failed transaction rolls back and later writes still work', () async {

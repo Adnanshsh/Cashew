@@ -3,6 +3,7 @@ import 'package:budget/database/tables.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/pages/autoTransactionsPageEmail.dart';
 import 'package:budget/pages/addTransactionPage.dart';
+import 'package:budget/pages/expense_tools/bank_sms_paste_page.dart';
 import 'package:budget/struct/databaseGlobal.dart';
 import 'package:budget/struct/expense_tools/bank_sms_parser.dart';
 import 'package:budget/struct/expense_tools/expense_tools.dart';
@@ -131,6 +132,12 @@ class _BankSmsPageState extends State<BankSmsPage> {
               title:
                   Text(expenseText(context, 'رسائل البنوك', 'Bank messages')),
               actions: [
+                IconButton(
+                    tooltip: expenseText(
+                        context, 'الصق رسالة البنك', 'Paste a bank message'),
+                    onPressed: () =>
+                        pushRoute(context, const BankSmsPastePage()),
+                    icon: const Icon(Icons.content_paste)),
                 IconButton(onPressed: _load, icon: const Icon(Icons.refresh))
               ]),
           body: _loading
