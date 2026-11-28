@@ -492,6 +492,11 @@ class PageNavigationFrameworkState extends State<PageNavigationFramework> {
   @override
   Widget build(BuildContext context) {
     return Stack(children: [
+      // Keep widget handling active when the dial or another tab is displayed.
+      const AndroidOnly(child: CheckWidgetLaunch()),
+      AndroidOnly(
+        child: RenderHomePageWidgets(key: renderHomePageWidgetsKey),
+      ),
       Scaffold(
         resizeToAvoidBottomInset: false,
         body: FadeIndexedStack(

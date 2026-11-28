@@ -49,7 +49,7 @@ jobs:
 
       - name: Test Database, Western Digits, and Swipe Selection
         working-directory: budget
-        run: flutter test test/native_database_test.dart test/western_digits_test.dart test/swipe_to_select_transactions_test.dart test/bank_sms_parser_test.dart test/spending_cycle_test.dart
+        run: flutter test test/native_database_test.dart test/western_digits_test.dart test/swipe_to_select_transactions_test.dart test/bank_sms_parser_test.dart test/spending_cycle_test.dart test/one_money_home_layout_test.dart
 
       - name: Build Release APK
         working-directory: budget

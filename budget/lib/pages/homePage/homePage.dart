@@ -40,7 +40,6 @@ import 'package:budget/widgets/linearGradientFadedEdges.dart';
 import 'package:budget/widgets/pullDownToRefreshSync.dart';
 import 'package:budget/widgets/util/rightSideClipper.dart';
 import 'package:flutter/services.dart';
-import 'package:budget/widgets/util/checkWidgetLaunch.dart';
 import 'package:flutter/foundation.dart';
 
 class HomePage extends StatefulWidget {
@@ -247,8 +246,6 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
         scrollController: _scrollController,
         child: Stack(
           children: [
-            AndroidOnly(child: CheckWidgetLaunch()),
-            AndroidOnly(child: RenderHomePageWidgets()),
             Scaffold(
               resizeToAvoidBottomInset: false,
               body: ScrollbarWrap(
